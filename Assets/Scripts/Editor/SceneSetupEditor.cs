@@ -138,6 +138,16 @@ namespace TenjikuDevaYuddha.Editor
             battleObj.transform.SetParent(systemsRoot.transform);
             battleObj.AddComponent<TenjikuDevaYuddha.Core.BattleSystem>();
 
+            // Vastu & Astrology System
+            var vastuObj = new GameObject("VastuAstrologySystem");
+            vastuObj.transform.SetParent(systemsRoot.transform);
+            vastuObj.AddComponent<TenjikuDevaYuddha.Core.VastuAstrologySystem>();
+
+            // Gurukul & Ayurveda System
+            var gurukulObj = new GameObject("GurukulAyurvedaSystem");
+            gurukulObj.transform.SetParent(systemsRoot.transform);
+            gurukulObj.AddComponent<TenjikuDevaYuddha.Core.GurukulAyurvedaSystem>();
+
             // ─── UI ───
             var uiRoot = new GameObject("--- UI ---");
             var hudObj = new GameObject("GameHUD");

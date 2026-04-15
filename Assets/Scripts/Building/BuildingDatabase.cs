@@ -636,6 +636,242 @@ namespace TenjikuDevaYuddha.Core
                 MaxCapacityBonus = new(),
                 PrefabName = "Building_KalkiTemple"
             });
+
+            // ══════════════════════════════════════════
+            //  GURUKUL — Education Buildings
+            // ══════════════════════════════════════════
+            Register(new BuildingDefinition
+            {
+                TypeId = "Gurukul",
+                Name = "गुरुकुल (Gurukul)",
+                Description = "Ancient school where students live with the Guru. Teaches Vedas, martial arts, dharma, and all branches of knowledge. Every citizen can learn here.",
+                Category = BuildingCategory.City,
+                RequiredAge = 1,
+                Size = new Vector2Int(3, 2),
+                BuildTimeSeconds = 50f,
+                XPReward = 50,
+                Cost = new() { { ResourceType.Kashtha, 60f }, { ResourceType.Pashana, 40f }, { ResourceType.Suvarna, 50f } },
+                ProductionPerTick = new() { { ResourceType.Vidya, 8f } },
+                MaxCapacityBonus = new() { { ResourceType.Praja, 10f } },
+                PrefabName = "Building_Gurukul"
+            });
+
+            Register(new BuildingDefinition
+            {
+                TypeId = "VedaPatha",
+                Name = "वेद पाठशाला (Veda School)",
+                Description = "Advanced Vedic school where Brahmacharya students study all four Vedas under renowned Rishis. Dramatically boosts research speed.",
+                Category = BuildingCategory.City,
+                RequiredAge = 4,
+                Size = new Vector2Int(3, 3),
+                BuildTimeSeconds = 90f,
+                XPReward = 80,
+                Cost = new() { { ResourceType.Pashana, 100f }, { ResourceType.Kashtha, 60f }, { ResourceType.Suvarna, 200f }, { ResourceType.Vidya, 30f } },
+                ProductionPerTick = new() { { ResourceType.Vidya, 15f }, { ResourceType.Shakti, 3f } },
+                MaxCapacityBonus = new(),
+                PrefabName = "Building_VedaPatha"
+            });
+
+            // ══════════════════════════════════════════
+            //  AYURVEDA — Health & Medicine Buildings
+            // ══════════════════════════════════════════
+            Register(new BuildingDefinition
+            {
+                TypeId = "VaidyaKutir",
+                Name = "वैद्य कुटीर (Healer's Hut)",
+                Description = "A village healer's cottage where the Vaidya (physician) treats ailments using herbs, mantras, and Nadi Pariksha (pulse diagnosis).",
+                Category = BuildingCategory.Village,
+                RequiredAge = 1,
+                Size = new Vector2Int(1, 1),
+                BuildTimeSeconds = 20f,
+                XPReward = 20,
+                Cost = new() { { ResourceType.Kashtha, 30f }, { ResourceType.Anna, 15f } },
+                ProductionPerTick = new() { { ResourceType.Anna, 2f } },
+                MaxCapacityBonus = new() { { ResourceType.Praja, 8f } },
+                PrefabName = "Building_VaidyaKutir"
+            });
+
+            Register(new BuildingDefinition
+            {
+                TypeId = "HerbGarden",
+                Name = "औषधि वाटिका (Herb Garden)",
+                Description = "A garden of medicinal herbs — Tulsi, Ashwagandha, Brahmi, Neem, Amla. Essential for Ayurvedic preparations and population health.",
+                Category = BuildingCategory.Village,
+                RequiredAge = 2,
+                Size = new Vector2Int(2, 2),
+                BuildTimeSeconds = 25f,
+                XPReward = 25,
+                Cost = new() { { ResourceType.Kashtha, 20f }, { ResourceType.Suvarna, 30f }, { ResourceType.Anna, 10f } },
+                ProductionPerTick = new() { { ResourceType.Anna, 4f }, { ResourceType.Vidya, 1f } },
+                MaxCapacityBonus = new(),
+                PrefabName = "Building_HerbGarden"
+            });
+
+            Register(new BuildingDefinition
+            {
+                TypeId = "AushadhiKendra",
+                Name = "औषधि केन्द्र (Ayurvedic Center)",
+                Description = "A full Ayurvedic treatment center offering Panchakarma, Rasayana, and Sushruta's surgical techniques. Major health boost to population.",
+                Category = BuildingCategory.City,
+                RequiredAge = 4,
+                Size = new Vector2Int(3, 2),
+                BuildTimeSeconds = 70f,
+                XPReward = 65,
+                Cost = new() { { ResourceType.Pashana, 80f }, { ResourceType.Kashtha, 50f }, { ResourceType.Suvarna, 120f }, { ResourceType.Vidya, 20f } },
+                ProductionPerTick = new() { { ResourceType.Vidya, 3f }, { ResourceType.Praja, 2f } },
+                MaxCapacityBonus = new() { { ResourceType.Praja, 20f } },
+                PrefabName = "Building_AushadhiKendra"
+            });
+
+            Register(new BuildingDefinition
+            {
+                TypeId = "YogaShala",
+                Name = "योग शाला (Yoga Hall)",
+                Description = "A hall for practicing Patanjali's Ashtanga Yoga — Asana, Pranayama, Dhyana. Balances Doshas and increases population happiness and productivity.",
+                Category = BuildingCategory.City,
+                RequiredAge = 3,
+                Size = new Vector2Int(2, 2),
+                BuildTimeSeconds = 40f,
+                XPReward = 40,
+                Cost = new() { { ResourceType.Kashtha, 40f }, { ResourceType.Pashana, 30f }, { ResourceType.Suvarna, 50f } },
+                ProductionPerTick = new() { { ResourceType.Shakti, 3f }, { ResourceType.Vidya, 2f } },
+                MaxCapacityBonus = new(),
+                PrefabName = "Building_YogaShala"
+            });
+
+            Register(new BuildingDefinition
+            {
+                TypeId = "JalChikitsa",
+                Name = "जल चिकित्सा (Water Therapy)",
+                Description = "Sacred bathing pools and mineral water therapy using river and hot spring water. Reduces Pitta and Kapha doshas.",
+                Category = BuildingCategory.Village,
+                RequiredAge = 2,
+                Size = new Vector2Int(2, 1),
+                BuildTimeSeconds = 30f,
+                XPReward = 25,
+                Cost = new() { { ResourceType.Pashana, 40f }, { ResourceType.Suvarna, 30f } },
+                ProductionPerTick = new() { { ResourceType.Anna, 2f }, { ResourceType.Shakti, 1f } },
+                MaxCapacityBonus = new(),
+                PrefabName = "Building_JalChikitsa"
+            });
+
+            // ══════════════════════════════════════════
+            //  VASTU & ASTRONOMY Buildings
+            // ══════════════════════════════════════════
+            Register(new BuildingDefinition
+            {
+                TypeId = "Observatory",
+                Name = "वेधशाला (Vedh Shala / Observatory)",
+                Description = "An astronomical observatory for studying Nakshatras, planetary movements, and eclipses per Surya Siddhanta. Reveals celestial knowledge.",
+                Category = BuildingCategory.City,
+                RequiredAge = 5,
+                Size = new Vector2Int(2, 2),
+                BuildTimeSeconds = 80f,
+                XPReward = 70,
+                Cost = new() { { ResourceType.Pashana, 100f }, { ResourceType.Loha, 40f }, { ResourceType.Suvarna, 150f }, { ResourceType.Vidya, 30f } },
+                ProductionPerTick = new() { { ResourceType.Vidya, 10f }, { ResourceType.Shakti, 2f } },
+                MaxCapacityBonus = new(),
+                PrefabName = "Building_Observatory"
+            });
+
+            Register(new BuildingDefinition
+            {
+                TypeId = "VastuMandir",
+                Name = "वास्तु मन्दिर (Vastu Temple)",
+                Description = "A temple to Vastu Purusha — the cosmic being whose body forms the sacred geometry of architecture. Enhances all Vastu placement bonuses in the kingdom.",
+                Category = BuildingCategory.Divine,
+                RequiredAge = 4,
+                Size = new Vector2Int(2, 2),
+                BuildTimeSeconds = 60f,
+                XPReward = 60,
+                Cost = new() { { ResourceType.Pashana, 80f }, { ResourceType.Kashtha, 40f }, { ResourceType.Suvarna, 100f }, { ResourceType.Shakti, 15f } },
+                ProductionPerTick = new() { { ResourceType.Shakti, 5f }, { ResourceType.Vidya, 5f } },
+                MaxCapacityBonus = new(),
+                PrefabName = "Building_VastuMandir"
+            });
+
+            // ══════════════════════════════════════════
+            //  COMMONER & VILLAGE Life Buildings
+            // ══════════════════════════════════════════
+            Register(new BuildingDefinition
+            {
+                TypeId = "GoshalaFarm",
+                Name = "गोशाला (Cow Sanctuary / Goshala)",
+                Description = "Sacred cow sanctuary providing milk, ghee, dung fuel, and Panchagavya medicine. The cow is revered as Kamadhenu, the wish-fulfilling cow.",
+                Category = BuildingCategory.Village,
+                RequiredAge = 1,
+                Size = new Vector2Int(2, 2),
+                BuildTimeSeconds = 30f,
+                XPReward = 30,
+                Cost = new() { { ResourceType.Kashtha, 35f }, { ResourceType.Anna, 20f }, { ResourceType.Suvarna, 25f } },
+                ProductionPerTick = new() { { ResourceType.Anna, 6f }, { ResourceType.Shakti, 1f } },
+                MaxCapacityBonus = new(),
+                PrefabName = "Building_GoshalaFarm"
+            });
+
+            Register(new BuildingDefinition
+            {
+                TypeId = "Panchayat",
+                Name = "पंचायत भवन (Village Council)",
+                Description = "The heart of village democracy since Vedic times. Five elected elders govern the gram. Boosts population happiness and reduces conflict.",
+                Category = BuildingCategory.Village,
+                RequiredAge = 2,
+                Size = new Vector2Int(2, 1),
+                BuildTimeSeconds = 25f,
+                XPReward = 25,
+                Cost = new() { { ResourceType.Kashtha, 30f }, { ResourceType.Pashana, 20f } },
+                ProductionPerTick = new() { { ResourceType.Vidya, 2f }, { ResourceType.Praja, 1f } },
+                MaxCapacityBonus = new() { { ResourceType.Praja, 10f } },
+                PrefabName = "Building_Panchayat"
+            });
+
+            Register(new BuildingDefinition
+            {
+                TypeId = "Dharamshala",
+                Name = "धर्मशाला (Rest House)",
+                Description = "Free rest house for travelers and pilgrims. Attracts population and increases trade. Every weary soul is welcome in dharma.",
+                Category = BuildingCategory.Village,
+                RequiredAge = 3,
+                Size = new Vector2Int(2, 1),
+                BuildTimeSeconds = 30f,
+                XPReward = 25,
+                Cost = new() { { ResourceType.Kashtha, 40f }, { ResourceType.Pashana, 25f }, { ResourceType.Suvarna, 20f } },
+                ProductionPerTick = new() { { ResourceType.Suvarna, 3f }, { ResourceType.Praja, 1f } },
+                MaxCapacityBonus = new() { { ResourceType.Praja, 8f } },
+                PrefabName = "Building_Dharamshala"
+            });
+
+            Register(new BuildingDefinition
+            {
+                TypeId = "NatyaShala",
+                Name = "नाट्यशाला (Theater / Dance Hall)",
+                Description = "A hall for Natya (drama), Nritya (dance), and Sangeet (music) per Bharata's Natyashastra. Boosts morale, culture, and population happiness.",
+                Category = BuildingCategory.City,
+                RequiredAge = 4,
+                Size = new Vector2Int(3, 2),
+                BuildTimeSeconds = 55f,
+                XPReward = 50,
+                Cost = new() { { ResourceType.Kashtha, 70f }, { ResourceType.Pashana, 40f }, { ResourceType.Suvarna, 80f } },
+                ProductionPerTick = new() { { ResourceType.Suvarna, 5f }, { ResourceType.Praja, 2f }, { ResourceType.Vidya, 2f } },
+                MaxCapacityBonus = new(),
+                PrefabName = "Building_NatyaShala"
+            });
+
+            Register(new BuildingDefinition
+            {
+                TypeId = "KumbharShala",
+                Name = "कुम्भार शाला (Potter's Workshop)",
+                Description = "Where artisan Kumbhar (potters) craft earthen vessels, Diya lamps, and sacred water pots. Supports village daily life and temple rituals.",
+                Category = BuildingCategory.Village,
+                RequiredAge = 1,
+                Size = new Vector2Int(1, 1),
+                BuildTimeSeconds = 18f,
+                XPReward = 15,
+                Cost = new() { { ResourceType.Pashana, 15f }, { ResourceType.Kashtha, 10f } },
+                ProductionPerTick = new() { { ResourceType.Suvarna, 3f } },
+                MaxCapacityBonus = new(),
+                PrefabName = "Building_KumbharShala"
+            });
         }
 
         private static void Register(BuildingDefinition def)
