@@ -70,6 +70,11 @@ namespace TenjikuDevaYuddha.Core
         public int MapSeed = 0;
 
         // ─────────────────────────────────────────────
+        //  Governance & Laws (Darbar)
+        // ─────────────────────────────────────────────
+        public GovernanceState Governance = new();
+
+        // ─────────────────────────────────────────────
         //  Settings
         // ─────────────────────────────────────────────
         public float MusicVolume = 0.7f;
@@ -357,5 +362,50 @@ namespace TenjikuDevaYuddha.Core
         Conquest,           // Attack NPC kingdoms
         DharmaYuddha,      // Honorable battles with rules
         KurukshetraArena    // PvP (future multiplayer)
+    }
+
+    // ─────────────────────────────────────────────
+    //  Governance & Law State
+    // ─────────────────────────────────────────────
+    [Serializable]
+    public class GovernanceState
+    {
+        // 1. Praja (Population) Allocation (0.0 to 1.0 percentages)
+        public float KrishakAllocation = 0.40f; // Farmers/Gatherers
+        public float ShilpiAllocation = 0.30f;  // Artisans/Builders
+        public float SainikAllocation = 0.10f;  // Soldiers/Guards
+        public float VidvanAllocation = 0.20f;  // Scholars/Priests
+
+        // 2. Navaratna (9 Ministers) — stores the names of appointed ministers. Empty means vacant.
+        public string Purohita = "";
+        public string Senapati = "";
+        public string Amatya = "";
+        public string Nyayadhish = "";
+        public string Mantri = "";
+        public string Sthapati = "";
+        public string Vaidyaraj = "";
+        public string Senani = "";
+        public string Pradhan = "";
+
+        // 3. Dharmaniti (Active Laws)
+        public List<string> ActiveLaws = new();
+
+        // 4. Petitions (Active problems from citizens)
+        public List<PetitionState> ActivePetitions = new();
+
+        // 5. Kingdom Metrics
+        public float Happiness = 80f;     // 0-100
+        public float Loyalty = 75f;       // 0-100
+    }
+
+    [Serializable]
+    public class PetitionState
+    {
+        public string Id;
+        public string Title;
+        public string Description;
+        public string Type; // "Agriculture", "Crime", "Religion", etc.
+        public long CreatedAt;
+        public float TimeRemainingSeconds;
     }
 }
