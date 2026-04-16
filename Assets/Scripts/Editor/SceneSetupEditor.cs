@@ -148,6 +148,12 @@ namespace TenjikuDevaYuddha.Editor
             gurukulObj.transform.SetParent(systemsRoot.transform);
             gurukulObj.AddComponent<TenjikuDevaYuddha.Core.GurukulAyurvedaSystem>();
 
+            // Governance (Darbar) System
+            var govObj = new GameObject("GovernanceSystem");
+            govObj.transform.SetParent(systemsRoot.transform);
+            govObj.AddComponent<TenjikuDevaYuddha.Core.GovernanceSystem>();
+            govObj.AddComponent<TenjikuDevaYuddha.Core.PetitionSystem>();
+
             // ─── UI ───
             var uiRoot = new GameObject("--- UI ---");
             var hudObj = new GameObject("GameHUD");

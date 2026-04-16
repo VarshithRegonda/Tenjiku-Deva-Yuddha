@@ -16,11 +16,14 @@ namespace TenjikuDevaYuddha.Core
         private bool _showAvatarProgress = false;
         private bool _showBattleMenu = false;
         private bool _showArmyMenu = false;
+        private bool _showDarbarMenu = false;
+        private int _darbarTab = 0; // 0=Petitions, 1=Praja, 2=Ministers, 3=Laws
         private string _notification = "";
         private float _notifTimer = 0f;
 
         private Vector2 _buildMenuScroll;
         private Vector2 _battleMenuScroll;
+        private Vector2 _darbarMenuScroll;
 
         // Styles
         private GUIStyle _headerStyle;
@@ -101,6 +104,7 @@ namespace TenjikuDevaYuddha.Core
             if (_showAvatarProgress) DrawAvatarProgress(state);
             if (_showBattleMenu) DrawBattleMenu(state);
             if (_showArmyMenu) DrawArmyMenu(state);
+            if (_showDarbarMenu) DrawDarbarMenu(state);
 
             // ─── Notifications ───
             DrawNotification();
@@ -262,6 +266,10 @@ namespace TenjikuDevaYuddha.Core
 
             if (GUI.Button(new Rect(x, y, btnW, btnH), "🛡️ Army", _buttonStyle))
                 TogglePanel(ref _showArmyMenu);
+            x += btnW + 5;
+
+            if (GUI.Button(new Rect(x, y, btnW, btnH), "⚖️ Darbar", _buttonStyle))
+                TogglePanel(ref _showDarbarMenu);
             x += btnW + 5;
 
             // Right side: Save & Menu
@@ -740,6 +748,202 @@ namespace TenjikuDevaYuddha.Core
         }
 
         // ─────────────────────────────────────────────
+        //  Darbar (Governance & Petitions) Panel
+        // ─────────────────────────────────────────────
+        private void DrawDarbarMenu(GameState state)
+        {
+            float panelW = 550;
+            float panelH = 450;
+            float panelX = Screen.width / 2 - panelW / 2;
+            float panelY = Screen.height / 2 - panelH / 2;
+
+            GUI.color = new Color(0.15f, 0.1f, 0.05f, 0.95f);
+            GUI.DrawTexture(new Rect(panelX, panelY, panelW, panelH), Texture2D.whiteTexture);
+            GUI.color = Color.white;
+
+            GUI.Label(new Rect(panelX + 10, panelY + 5, 400, 25), "⚖️ RAJA DARBAR — ROYAL COURT", _headerStyle);
+
+            // Tabs
+            string[] tabs = { "📜 Petitions", "👥 Praja (People)", "👑 Navaratna", "📜 Dharmaniti" };
+            _darbarTab = GUI.Toolbar(new Rect(panelX + 10, panelY + 35, panelW - 20, 30), _darbarTab, tabs);
+
+            float contentY = panelY + 70;
+            float contentH = panelH - 80;
+
+            if (_darbarTab == 0) // Petitions
+            {
+                var petitions = state.Governance.ActivePetitions;
+                if (petitions.Count == 0)
+                {
+                    GUI.Label(new Rect(panelX + 10, contentY + 20, panelW - 20, 30), 
+                        "The court is peaceful. No citizen problems today.", _resourceStyle);
+                }
+                else
+                {
+                    _darbarMenuScroll = GUI.BeginScrollView(
+                        new Rect(panelX + 5, contentY, panelW - 10, contentH),
+                        _darbarMenuScroll,
+                        new Rect(0, 0, panelW - 30, petitions.Count * 90));
+
+                    float yy = 0;
+                    for (int i = 0; i < petitions.Count; i++)
+                    {
+                        var p = petitions[i];
+                        var def = PetitionSystem.Instance?.GetPetitionTemplate(p.Title);
+                        if (def == null) continue;
+
+                        GUI.color = new Color(0.2f, 0.15f, 0.1f);
+                        GUI.DrawTexture(new Rect(0, yy, panelW - 30, 85), Texture2D.whiteTexture);
+                        GUI.color = Color.white;
+
+                        GUI.Label(new Rect(5, yy + 2, 350, 20), $"⚠ {p.Title} ({p.Type})", _resourceStyle);
+                        GUI.Label(new Rect(5, yy + 20, 400, 30), p.Description,
+                            new GUIStyle(GUI.skin.label) { fontSize = 11, wordWrap = true, normal = { textColor = Color.gray } });
+
+                        string costStr = "";
+                        foreach (var c in def.ResolutionCost) costStr += $"{GameConstants.RESOURCE_ICONS[c.Key]}{c.Value:F0} ";
+                        GUI.Label(new Rect(5, yy + 55, 300, 20), $"Cost: {costStr}",
+                            new GUIStyle(GUI.skin.label) { fontSize = 11, normal = { textColor = new Color(1f, 0.6f, 0.3f) } });
+
+                        GUI.Label(new Rect(panelW - 150, yy + 2, 100, 20), $"Time: {p.TimeRemainingSeconds:F0}s",
+                            new GUIStyle(GUI.skin.label) { fontSize = 10, normal = { textColor = Color.red } });
+
+                        if (GUI.Button(new Rect(panelW - 105, yy + 40, 70, 30), "Resolve"))
+                        {
+                            PetitionSystem.Instance?.ResolvePetition(p.Id);
+                        }
+
+                        yy += 90;
+                    }
+                    GUI.EndScrollView();
+                }
+            }
+            else if (_darbarTab == 1) // Praja
+            {
+                GUI.Label(new Rect(panelX + 10, contentY, panelW - 20, 20), 
+                    "Assign your population to different vocational paths.", _resourceStyle);
+                
+                float k = state.Governance.KrishakAllocation * 100f;
+                float s = state.Governance.ShilpiAllocation * 100f;
+                float a = state.Governance.SainikAllocation * 100f;
+                float v = state.Governance.VidvanAllocation * 100f;
+
+                float yy = contentY + 30;
+                GUI.Label(new Rect(panelX + 10, yy, 150, 20), $"🌾 Krishak (Farmers): {k:F0}%", _resourceStyle);
+                k = GUI.HorizontalSlider(new Rect(panelX + 170, yy + 5, 200, 20), k, 0, 100);
+                yy += 30;
+
+                GUI.Label(new Rect(panelX + 10, yy, 150, 20), $"🛠️ Shilpi (Artisans): {s:F0}%", _resourceStyle);
+                s = GUI.HorizontalSlider(new Rect(panelX + 170, yy + 5, 200, 20), s, 0, 100);
+                yy += 30;
+
+                GUI.Label(new Rect(panelX + 10, yy, 150, 20), $"🏹 Sainik (Guards): {a:F0}%", _resourceStyle);
+                a = GUI.HorizontalSlider(new Rect(panelX + 170, yy + 5, 200, 20), a, 0, 100);
+                yy += 30;
+
+                GUI.Label(new Rect(panelX + 10, yy, 150, 20), $"📜 Vidvan (Scholars): {v:F0}%", _resourceStyle);
+                v = GUI.HorizontalSlider(new Rect(panelX + 170, yy + 5, 200, 20), v, 0, 100);
+
+                if (GUI.Button(new Rect(panelX + 390, contentY + 60, 120, 40), "Apply Roles"))
+                {
+                    GovernanceSystem.Instance?.SetPrajaAllocation(k, s, a, v);
+                    GameEvents.ShowNotification("👥 Population Roles Updated!");
+                }
+
+                // Show multipliers
+                yy += 60;
+                if (GovernanceSystem.Instance != null) {
+                    GUI.Label(new Rect(panelX + 10, yy, panelW - 20, 40), 
+                        $"Food Prod: {GovernanceSystem.Instance.GetKrishakMultiplier():F1}x | Material Prod: {GovernanceSystem.Instance.GetShilpiMultiplier():F1}x\n" +
+                        $"Army Speed: {GovernanceSystem.Instance.GetSainikMultiplier():F1}x | Vidya Prod: {GovernanceSystem.Instance.GetVidvanMultiplier():F1}x", 
+                        new GUIStyle(GUI.skin.label) { fontSize = 12, normal = { textColor = new Color(0.8f, 1f, 0.8f) } });
+                }
+            }
+            else if (_darbarTab == 2) // Ministers
+            {
+                _darbarMenuScroll = GUI.BeginScrollView(
+                        new Rect(panelX + 5, contentY, panelW - 10, contentH),
+                        _darbarMenuScroll,
+                        new Rect(0, 0, panelW - 30, 9 * 50));
+
+                float yy = 0;
+                foreach (MinisterRole role in System.Enum.GetValues(typeof(MinisterRole)))
+                {
+                    bool isAppointed = GovernanceSystem.Instance?.IsMinisterAppointed(role) ?? false;
+                    
+                    GUI.color = isAppointed ? new Color(0.2f, 0.3f, 0.2f) : new Color(0.2f, 0.15f, 0.1f);
+                    GUI.DrawTexture(new Rect(0, yy, panelW - 30, 45), Texture2D.whiteTexture);
+                    GUI.color = Color.white;
+
+                    GUI.Label(new Rect(5, yy + 10, 150, 25), role.ToString(), _resourceStyle);
+                    
+                    if (isAppointed)
+                    {
+                        string name = "";
+                        if (role == MinisterRole.Purohita) name = state.Governance.Purohita;
+                        else if (role == MinisterRole.Senapati) name = state.Governance.Senapati;
+                        else if (role == MinisterRole.Amatya) name = state.Governance.Amatya;
+                        // etc ... (Simplified display)
+                        if (string.IsNullOrEmpty(name)) name = "Appointed";
+                        GUI.Label(new Rect(160, yy + 10, 200, 25), $"✅ {name}", _resourceStyle);
+
+                        if (GUI.Button(new Rect(panelW - 100, yy + 8, 60, 30), "Dismiss"))
+                            GovernanceSystem.Instance?.DismissMinister(role);
+                    }
+                    else
+                    {
+                        GUI.Label(new Rect(160, yy + 10, 200, 25), "❌ Vacant", 
+                            new GUIStyle(GUI.skin.label) { fontSize = 12, normal = { textColor = Color.red } });
+                        if (GUI.Button(new Rect(panelW - 100, yy + 8, 60, 30), "Appoint"))
+                            GovernanceSystem.Instance?.AppointMinister(role, "Elder");
+                    }
+                    yy += 50;
+                }
+                GUI.EndScrollView();
+            }
+            else if (_darbarTab == 3) // Laws
+            {
+                _darbarMenuScroll = GUI.BeginScrollView(
+                        new Rect(panelX + 5, contentY, panelW - 10, contentH),
+                        _darbarMenuScroll,
+                        new Rect(0, 0, panelW - 30, GovernanceSystem.ALL_LAWS.Count * 65));
+
+                float yy = 0;
+                foreach (var law in GovernanceSystem.ALL_LAWS)
+                {
+                    bool isActive = GovernanceSystem.Instance?.IsLawActive(law.Id) ?? false;
+                    bool isUnlocked = GovernanceSystem.Instance?.IsLawUnlocked(law.Id) ?? false;
+
+                    GUI.color = isActive ? new Color(0.2f, 0.2f, 0.3f) : new Color(0.1f, 0.1f, 0.1f);
+                    GUI.DrawTexture(new Rect(0, yy, panelW - 30, 60), Texture2D.whiteTexture);
+                    GUI.color = Color.white;
+
+                    GUI.Label(new Rect(5, yy + 2, 350, 20), $"⚖️ {law.Name} ({law.Source})", _resourceStyle);
+                    GUI.Label(new Rect(5, yy + 22, 400, 35), law.Description,
+                        new GUIStyle(GUI.skin.label) { fontSize = 10, wordWrap = true, normal = { textColor = Color.gray } });
+
+                    if (isActive)
+                    {
+                        if (GUI.Button(new Rect(panelW - 100, yy + 15, 60, 30), "Revoke"))
+                            GovernanceSystem.Instance?.RevokeLaw(law.Id);
+                    }
+                    else if (isUnlocked)
+                    {
+                        if (GUI.Button(new Rect(panelW - 100, yy + 15, 60, 30), "Enact"))
+                            GovernanceSystem.Instance?.EnactLaw(law.Id);
+                    }
+                    else
+                    {
+                        GUI.Label(new Rect(panelW - 150, yy + 15, 120, 30), $"Requires: {law.Prerequisite}",
+                            new GUIStyle(GUI.skin.label) { fontSize = 10, normal = { textColor = Color.red } });
+                    }
+                    yy += 65;
+                }
+                GUI.EndScrollView();
+            }
+        }
+
+        // ─────────────────────────────────────────────
         //  Notifications
         // ─────────────────────────────────────────────
         private void OnNotification(string message)
@@ -784,6 +988,7 @@ namespace TenjikuDevaYuddha.Core
             _showAvatarProgress = false;
             _showBattleMenu = false;
             _showArmyMenu = false;
+            _showDarbarMenu = false;
         }
     }
 }
