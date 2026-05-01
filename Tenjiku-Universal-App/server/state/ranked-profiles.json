@@ -1,0 +1,222 @@
+[
+  {
+    "playerId": "profile_load_player_3",
+    "displayName": "LOAD_PLAYER_3",
+    "mmr": 990,
+    "wins": 0,
+    "losses": 1,
+    "matchesPlayed": 1,
+    "smurfScore": 55,
+    "antiCheatFlags": 0,
+    "lastUpdatedAt": 1776514093064
+  },
+  {
+    "playerId": "profile_load_player_18",
+    "displayName": "LOAD_PLAYER_18",
+    "mmr": 1010,
+    "wins": 1,
+    "losses": 0,
+    "matchesPlayed": 1,
+    "smurfScore": 113,
+    "antiCheatFlags": 0,
+    "lastUpdatedAt": 1776514093073
+  },
+  {
+    "playerId": "profile_load_player_19",
+    "displayName": "LOAD_PLAYER_19",
+    "mmr": 990,
+    "wins": 0,
+    "losses": 1,
+    "matchesPlayed": 1,
+    "smurfScore": 59,
+    "antiCheatFlags": 0,
+    "lastUpdatedAt": 1776514093092
+  },
+  {
+    "playerId": "profile_load_player_0",
+    "displayName": "LOAD_PLAYER_0",
+    "mmr": 930,
+    "wins": 1,
+    "losses": 0,
+    "matchesPlayed": 1,
+    "smurfScore": 82,
+    "antiCheatFlags": 0,
+    "lastUpdatedAt": 1776514093141
+  },
+  {
+    "playerId": "profile_load_player_1",
+    "displayName": "LOAD_PLAYER_1",
+    "mmr": 910,
+    "wins": 0,
+    "losses": 1,
+    "matchesPlayed": 1,
+    "smurfScore": 44,
+    "antiCheatFlags": 0,
+    "lastUpdatedAt": 1776514093084
+  },
+  {
+    "playerId": "profile_load_player_2",
+    "displayName": "LOAD_PLAYER_2",
+    "mmr": 1010,
+    "wins": 1,
+    "losses": 0,
+    "matchesPlayed": 1,
+    "smurfScore": 105,
+    "antiCheatFlags": 0,
+    "lastUpdatedAt": 1776514093104
+  },
+  {
+    "playerId": "profile_load_player_4",
+    "displayName": "LOAD_PLAYER_4",
+    "mmr": 1090,
+    "wins": 1,
+    "losses": 0,
+    "matchesPlayed": 1,
+    "smurfScore": 131,
+    "antiCheatFlags": 0,
+    "lastUpdatedAt": 1776514093122
+  },
+  {
+    "playerId": "profile_load_player_5",
+    "displayName": "LOAD_PLAYER_5",
+    "mmr": 1070,
+    "wins": 0,
+    "losses": 1,
+    "matchesPlayed": 1,
+    "smurfScore": 47,
+    "antiCheatFlags": 0,
+    "lastUpdatedAt": 1776514093114
+  },
+  {
+    "playerId": "profile_load_player_6",
+    "displayName": "LOAD_PLAYER_6",
+    "mmr": 1170,
+    "wins": 1,
+    "losses": 0,
+    "matchesPlayed": 1,
+    "smurfScore": 112,
+    "antiCheatFlags": 0,
+    "lastUpdatedAt": 1776514093180
+  },
+  {
+    "playerId": "profile_load_player_7",
+    "displayName": "LOAD_PLAYER_7",
+    "mmr": 1150,
+    "wins": 0,
+    "losses": 1,
+    "matchesPlayed": 1,
+    "smurfScore": 60,
+    "antiCheatFlags": 0,
+    "lastUpdatedAt": 1776514093130
+  },
+  {
+    "playerId": "profile_load_player_8",
+    "displayName": "LOAD_PLAYER_8",
+    "mmr": 930,
+    "wins": 1,
+    "losses": 0,
+    "matchesPlayed": 1,
+    "smurfScore": 104,
+    "antiCheatFlags": 0,
+    "lastUpdatedAt": 1776514093160
+  },
+  {
+    "playerId": "profile_load_player_9",
+    "displayName": "LOAD_PLAYER_9",
+    "mmr": 910,
+    "wins": 0,
+    "losses": 1,
+    "matchesPlayed": 1,
+    "smurfScore": 55,
+    "antiCheatFlags": 0,
+    "lastUpdatedAt": 1776514093152
+  },
+  {
+    "playerId": "profile_load_player_10",
+    "displayName": "LOAD_PLAYER_10",
+    "mmr": 1010,
+    "wins": 1,
+    "losses": 0,
+    "matchesPlayed": 1,
+    "smurfScore": 89,
+    "antiCheatFlags": 0,
+    "lastUpdatedAt": 1776514093196
+  },
+  {
+    "playerId": "profile_load_player_11",
+    "displayName": "LOAD_PLAYER_11",
+    "mmr": 990,
+    "wins": 0,
+    "losses": 1,
+    "matchesPlayed": 1,
+    "smurfScore": 48,
+    "antiCheatFlags": 0,
+    "lastUpdatedAt": 1776514093172
+  },
+  {
+    "playerId": "profile_load_player_12",
+    "displayName": "LOAD_PLAYER_12",
+    "mmr": 1090,
+    "wins": 1,
+    "losses": 0,
+    "matchesPlayed": 1,
+    "smurfScore": 113,
+    "antiCheatFlags": 0,
+    "lastUpdatedAt": 1776514093188
+  },
+  {
+    "playerId": "profile_load_player_13",
+    "displayName": "LOAD_PLAYER_13",
+    "mmr": 1070,
+    "wins": 0,
+    "losses": 1,
+    "matchesPlayed": 1,
+    "smurfScore": 60,
+    "antiCheatFlags": 0,
+    "lastUpdatedAt": 1776514093204
+  },
+  {
+    "playerId": "profile_load_player_14",
+    "displayName": "LOAD_PLAYER_14",
+    "mmr": 1140,
+    "wins": 0,
+    "losses": 0,
+    "matchesPlayed": 0,
+    "smurfScore": 0,
+    "antiCheatFlags": 0,
+    "lastUpdatedAt": 1776514093011
+  },
+  {
+    "playerId": "profile_load_player_15",
+    "displayName": "LOAD_PLAYER_15",
+    "mmr": 1180,
+    "wins": 0,
+    "losses": 0,
+    "matchesPlayed": 0,
+    "smurfScore": 0,
+    "antiCheatFlags": 0,
+    "lastUpdatedAt": 1776514093025
+  },
+  {
+    "playerId": "profile_load_player_16",
+    "displayName": "LOAD_PLAYER_16",
+    "mmr": 900,
+    "wins": 0,
+    "losses": 0,
+    "matchesPlayed": 0,
+    "smurfScore": 0,
+    "antiCheatFlags": 0,
+    "lastUpdatedAt": 1776514093040
+  },
+  {
+    "playerId": "profile_load_player_17",
+    "displayName": "LOAD_PLAYER_17",
+    "mmr": 940,
+    "wins": 0,
+    "losses": 0,
+    "matchesPlayed": 0,
+    "smurfScore": 0,
+    "antiCheatFlags": 0,
+    "lastUpdatedAt": 1776514093055
+  }
+]

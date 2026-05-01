@@ -1,14 +1,13 @@
 import React from 'react';
-import { StyleSheet, Text, View, ScrollView, SafeAreaView, TouchableOpacity, Dimensions, Image, Easing, ImageSourcePropType, ImageBackground, Platform, Alert, Animated as BaseAnimated } from 'react-native';
-import Reanimated, { useSharedValue, useAnimatedStyle, withRepeat, withTiming, withSequence, withDelay, interpolate, Extrapolate } from 'react-native-reanimated';
-import { FontAwesome5, MaterialCommunityIcons, Ionicons, Entypo, Feather } from '@expo/vector-icons';
-import { useWindowDimensions } from 'react-native';
-
-const BG_URLS = {
-  Hero: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200',
-  Villain: 'https://images.unsplash.com/photo-1511512578047-dfb367046420?q=80&w=1200',
-  Dashboard: 'https://images.unsplash.com/photo-1614850523296-d8c1af93d400?q=80&w=1200'
-};
+import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Image, Platform, Alert, Animated as BaseAnimated, useWindowDimensions } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import Reanimated, { useSharedValue, useAnimatedStyle, withRepeat, withTiming, interpolate } from 'react-native-reanimated';
+import { FontAwesome5, MaterialCommunityIcons, Ionicons, Entypo } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
+import { BUILD_PROFILES, RANKED_POLICY, resolvePlatformTarget } from '@/src/esports/config';
+import { defaultSpectatorSettings } from '@/src/esports/spectator';
+import { createOrGetProfile, linkPlatform, grantSeasonXp, type CrossProgressionProfile } from '@/src/esports/account';
+import { SOCIAL_PROGRESSION_PATH, FOUR_VEDAS_KNOWLEDGE, EPIC_STORY_ARCS, RUDRA_FORMS, RUDRA_FAMILY_STORY, WORLD_UNITY_ARCS } from '@/src/esports/lore';
 
 interface LogEntry {
   id: number;
@@ -28,6 +27,13 @@ interface GridCell {
   id: number;
   buildingId: string | null;
   direction: string;
+}
+
+interface PendingSyncAction {
+  id: number;
+  type: 'battle' | 'build';
+  payload: Record<string, unknown>;
+  createdAt: number;
 }
 
 
@@ -51,9 +57,26 @@ interface GameState {
   BattleLog: LogEntry[];
   IsMultiplayer: boolean;
   ConnectedPlayers: number;
+  UnlockedVedas: string[];
 }
 
 export default function GameDashboard() {
+  const [isOnline, setIsOnline] = React.useState(true);
+  const [pendingSyncActions, setPendingSyncActions] = React.useState<PendingSyncAction[]>([]);
+
+  const safeStorageSet = (key: string, value: string) => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.setItem(key, value);
+    }
+  };
+
+  const safeStorageGet = (key: string) => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage) {
+      return window.localStorage.getItem(key);
+    }
+    return null;
+  };
+
   const [gameState, setGameState] = React.useState<GameState>({
     PlayerName: "ARJUNA_PRO",
     KingdomName: "ARYAVARTA_PRIME",
@@ -88,20 +111,39 @@ export default function GameDashboard() {
     DietPref: 'Veg',
     SessionStartTime: Date.now(),
     DharmaStreak: 3,
-    MentalFocus: 100
+    MentalFocus: 100,
+    UnlockedVedas: []
   });
+
+  const saveGame = async (state: GameState) => {
+    safeStorageSet('EVOLUTION_SAVE', JSON.stringify(state));
+  };
+
+  const loadGame = () => {
+    const saved = safeStorageGet('EVOLUTION_SAVE');
+    if (saved) {
+      setGameState(JSON.parse(saved));
+      return true;
+    }
+    return false;
+  };
 
   const [language, setLanguage] = React.useState<'EN' | 'HI' | 'SAN' | 'ES'>('EN');
   const [isMounted, setIsMounted] = React.useState(false);
 
   React.useEffect(() => {
     setIsMounted(true);
+    loadGame();
   }, []);
+
+  React.useEffect(() => {
+    if (isMounted) saveGame(gameState);
+  }, [gameState, isMounted]);
 
   const TRANSLATIONS = {
     EN: {
       territory: "TERRITORY", sabha: "SABHA (DARBAR)", war: "WAR COMMAND", health: "DHARMA HEALTH", pro: "PRO LEAGUE",
-      vitality: "VITALITY INDEX", credits: "CREDITS (SUV)", actives: "ACTIVES (SAI)", rank: "RANKING",
+      vitality: "VITALITY INDEX", credits: "GOLD", actives: "ACTIVES (SAI)", rank: "RANKING",
       guide: "ANCIENT GUIDE", battle: "INITIATE DHARMA YUDDHA", train: "TRAIN SAINYA", wellness: "DHARMA & MANAS WELLNESS"
     },
     HI: {
@@ -123,12 +165,11 @@ export default function GameDashboard() {
 
   const t = (key: keyof typeof TRANSLATIONS['EN']) => TRANSLATIONS[language][key] || key;
 
-  const [activeTab, setActiveTab] = React.useState<'VastuBuilder' | 'Multiplayer' | 'DharmaYuddha' | 'VedicHealth' | 'Sabha'>('VastuBuilder');
+  const [activeTab, setActiveTab] = React.useState<'VastuBuilder' | 'Multiplayer' | 'DharmaYuddha' | 'VedicHealth' | 'Sabha' | 'LoreCodex'>('VastuBuilder');
   const [isTrailerMode, setIsTrailerMode] = React.useState(false);
   const [showCredits, setShowCredits] = React.useState(false);
   const [selectedCell, setSelectedCell] = React.useState<number | null>(null);
   const [isCinemaMode, setIsCinemaMode] = React.useState(false);
-  const [isScanning, setIsScanning] = React.useState(false);
   const [showGuide, setShowGuide] = React.useState(false);
   const [battleResult, setBattleResult] = React.useState<{ result: 'win' | 'loss', msg: string } | null>(null);
 
@@ -137,11 +178,73 @@ export default function GameDashboard() {
   const scanLine = useSharedValue(-200);
   const rotation = useSharedValue(0);
 
+  // Persistence & Data Recovery Logic
+  React.useEffect(() => {
+    const loadData = async () => {
+      try {
+        const saved = safeStorageGet('evolution_state');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          setGameState(prev => ({ ...prev, ...parsed }));
+        }
+      } catch { console.log("Persistence Init Failed"); }
+      setIsMounted(true);
+    };
+    loadData();
+  }, []);
+
+  React.useEffect(() => {
+    if (isMounted) {
+      safeStorageSet('evolution_state', JSON.stringify(gameState));
+    }
+  }, [gameState, isMounted]);
+
+  React.useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+    const updateNetworkStatus = () => setIsOnline(window.navigator.onLine);
+    updateNetworkStatus();
+    window.addEventListener('online', updateNetworkStatus);
+    window.addEventListener('offline', updateNetworkStatus);
+    return () => {
+      window.removeEventListener('online', updateNetworkStatus);
+      window.removeEventListener('offline', updateNetworkStatus);
+    };
+  }, []);
+
+  // Dynamic Day/Night Cycle Logic
+  const sessionDuration = (Date.now() - gameState.SessionStartTime) / 1000;
+  const isNightCycle = (Math.floor(sessionDuration / 60) % 2) === 0; // Shifts every 60s for demo speed
   React.useEffect(() => {
     glowValue.value = withRepeat(withTiming(1, { duration: 2500 }), -1, true);
     scanLine.value = withRepeat(withTiming(800, { duration: 5000 }), -1, false);
     rotation.value = withRepeat(withTiming(360, { duration: 20000 }), -1, false);
+    // Reanimated shared values are stable refs; run once on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Unity Bridge Ref (for future 3D Engine integration)
+  const unityWebViewRef = React.useRef<any>(null);
+
+  // Helper to send data to Unity 6 Engine
+  const sendToUnity = (action: string, data: any) => {
+    if (Platform.OS === 'web') {
+      const unityFrame = document.getElementById('unity-frame') as HTMLIFrameElement;
+      if (unityFrame && unityFrame.contentWindow) {
+        unityFrame.contentWindow.postMessage({ action, data }, '*');
+      }
+    } else {
+      unityWebViewRef.current?.postMessage(JSON.stringify({ action, data }));
+    }
+  };
+
+  // Sync Logic: Keep Unity 3D view updated with React State
+  React.useEffect(() => {
+    sendToUnity('SYNC_RESOURCES', { 
+      gold: gameState.Suvarna, 
+      army: gameState.Sainya, 
+      focus: gameState.MentalFocus 
+    });
+  }, [gameState.Suvarna, gameState.Sainya, gameState.MentalFocus]);
 
   const animatedGlow = useAnimatedStyle(() => ({
     opacity: glowValue.value,
@@ -155,15 +258,45 @@ export default function GameDashboard() {
   }));
 
   const animatedOrb = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${rotation.value}deg` }]
+    transform: [{ rotate: `${rotation.value}deg` }],
+    backgroundColor: withTiming(isNightCycle ? 'rgba(0, 240, 255, 0.08)' : 'rgba(255, 215, 0, 0.05)', { duration: 2000 })
   }));
 
   const { width } = useWindowDimensions();
   const isDesktop = width > 1024; // Pro Desktop standard
   const isTablet = width > 768 && width <= 1024;
+  const activePlatform = resolvePlatformTarget();
+  const deviceTier = isDesktop ? 'high' : isTablet ? 'mid' : 'low';
+  const activeBuildProfile = BUILD_PROFILES[activePlatform];
+  const activePerformanceProfile = activeBuildProfile.performance[deviceTier];
+  const bestEffortMode = !isOnline || activePerformanceProfile.targetFps <= 60;
+  const spectatorFeatures = defaultSpectatorSettings();
+  const [crossProfile, setCrossProfile] = React.useState<CrossProgressionProfile | null>(null);
+
+  React.useEffect(() => {
+    const profile = createOrGetProfile('local-player-1', gameState.PlayerName);
+    const linked = linkPlatform(profile.playerId, activePlatform) || profile;
+    setCrossProfile({ ...linked });
+  }, [activePlatform, gameState.PlayerName]);
 
   const fadeAnim = React.useRef(new BaseAnimated.Value(1)).current;
   const slideAnim = React.useRef(new BaseAnimated.Value(0)).current;
+
+  const triggerTapFeedback = React.useCallback(() => {
+    if (Platform.OS !== 'web') {
+      Haptics.selectionAsync().catch(() => undefined);
+    }
+  }, []);
+
+  const queueForSync = React.useCallback((type: PendingSyncAction['type'], payload: Record<string, unknown>) => {
+    const action: PendingSyncAction = { id: Date.now() + Math.floor(Math.random() * 1000), type, payload, createdAt: Date.now() };
+    setPendingSyncActions(prev => [action, ...prev].slice(0, 50));
+  }, []);
+
+  React.useEffect(() => {
+    if (!isOnline || pendingSyncActions.length === 0) return;
+    setPendingSyncActions([]);
+  }, [isOnline, pendingSyncActions.length]);
 
   // Universal Keyboard Shortcuts (Desktop/Laptop)
   React.useEffect(() => {
@@ -172,6 +305,7 @@ export default function GameDashboard() {
         if (e.key.toLowerCase() === 'b') setActiveTab('VastuBuilder');
         if (e.key.toLowerCase() === 'w') setActiveTab('DharmaYuddha');
         if (e.key.toLowerCase() === 'p') setActiveTab('Multiplayer');
+        if (e.key.toLowerCase() === 'l') setActiveTab('LoreCodex');
         if (e.key.toLowerCase() === 'm') setIsCinemaMode(!isCinemaMode);
       };
       window.addEventListener('keydown', handleKeyPress);
@@ -208,31 +342,19 @@ export default function GameDashboard() {
           Population: prev.Population + popGrowth,
           Shakti: prev.Shakti + vastuShakti,
           MentalFocus: Math.min(100, prev.MentalFocus + 1),
-          KingdomTier: newTier
+          KingdomTier: newTier,
+          WinRate: Math.max(90, Math.min(99, prev.WinRate + (Math.random() > 0.5 ? 0.1 : -0.1)))
         };
       });
     }, 3000);
     return () => clearInterval(interval);
   }, []);
 
-  const trainSainya = () => {
-    const barracksCount = gameState.Buildings.find(b => b.type === 'barracks')?.count || 0;
-    if (barracksCount === 0) {
-      setGameState(prev => ({ ...prev, BattleLog: [{ id: Date.now(), text: "Build Sainya Barracks first!", type: 'build' as const }, ...prev.BattleLog].slice(0, 5) }));
-      return;
-    }
-    const cost = 50;
-    if (gameState.Suvarna < cost) return;
-
-    setGameState(prev => ({
-      ...prev,
-      Suvarna: prev.Suvarna - cost,
-      Sainya: prev.Sainya + 10,
-      BattleLog: [{ id: Date.now(), text: "Trained 10 Sainya Warriors.", type: 'combat' as const }, ...prev.BattleLog].slice(0, 5)
-    }));
-  };
-
   const startBattle = () => {
+    triggerTapFeedback();
+    if (!isOnline) {
+      queueForSync('battle', { timestamp: Date.now(), sainya: gameState.Sainya, shakti: gameState.Shakti });
+    }
     const enemyPower = Math.floor(Math.random() * 50) + 10;
     const playerPower = (gameState.Sainya * 1.5) + (gameState.Shakti * 2);
 
@@ -244,6 +366,10 @@ export default function GameDashboard() {
         BattleLog: [{ id: Date.now(), text: `VICTORY! Defeated Invaders. Looted ${loot} Suvarna.`, type: 'combat' as const }, ...prev.BattleLog].slice(0, 5)
       }));
       setBattleResult({ result: 'win', msg: `Victory! Your Dharma and Sainya prevailed.` });
+      if (crossProfile) {
+        const updated = grantSeasonXp(crossProfile.playerId, 150);
+        if (updated) setCrossProfile({ ...updated });
+      }
     } else {
       setGameState(prev => ({
         ...prev,
@@ -251,31 +377,45 @@ export default function GameDashboard() {
         BattleLog: [{ id: Date.now(), text: "DEFEAT! Your Sainya retreated.", type: 'combat' as const }, ...prev.BattleLog].slice(0, 5)
       }));
       setBattleResult({ result: 'loss', msg: `Defeat. You need more Sainya or Shakti.` });
+      if (crossProfile) {
+        const updated = grantSeasonXp(crossProfile.playerId, 40);
+        if (updated) setCrossProfile({ ...updated });
+      }
     }
     setTimeout(() => setBattleResult(null), 3000);
   };
 
   const renderDharmaYuddha = () => (
     <View style={styles.warRoom}>
-      <Text style={styles.sectionHeader}>{t('war')}</Text>
+      <View style={styles.battleHeaderPro}>
+        <View style={styles.proIconContainer}>
+          <Reanimated.View style={[styles.divineBloom, animatedGlow]}>
+             <MaterialCommunityIcons name="sword-cross" size={32} color="#FF4444" />
+          </Reanimated.View>
+        </View>
+        <View style={styles.powerInfo}>
+          <Text style={styles.proRankLabel}>BATTLE SECTOR</Text>
+          <Text style={styles.heroName}>Kuru-Kshetra Alpha</Text>
+        </View>
+        <View style={styles.rankBadge}>
+          <Text style={styles.rankLabel}>WIN PROBABILITY</Text>
+          <Text style={styles.rankValue}>{gameState.WinRate}%</Text>
+        </View>
+      </View>
 
       <View style={styles.armyCard}>
         <View style={styles.statRow}>
-          <MaterialCommunityIcons name="sword-cross" size={40} color="#FF4444" />
           <View>
-            <Text style={styles.armyTitle}>{t('actives')}</Text>
-            <Text style={styles.armyCount}>{gameState.Sainya} Warriors</Text>
+            <Text style={styles.armyTitle}>AKSHAUHINI POWER</Text>
+            <Text style={styles.armyCount}>{gameState.Sainya}K</Text>
           </View>
+          <Reanimated.View style={[styles.statusDot, animatedGlow, { backgroundColor: '#FF4444', shadowColor: '#FF4444' }]} />
         </View>
-
         <View style={styles.powerGauge}>
-          <View style={styles.powerInfo}>
-            <Text style={styles.powerLabel}>{t('credits')} (SUV)</Text>
-            <Text style={styles.powerVal}>+{(gameState.Shakti * 2).toFixed(0)} SHAKTI</Text>
-          </View>
-          <TouchableOpacity style={styles.trainButtonPro} onPress={trainSainya}>
-            <Text style={styles.trainTextPro}>{t('train')}</Text>
-          </TouchableOpacity>
+           <Text style={styles.powerLabel}>DHARMA STRENGTH</Text>
+           <View style={styles.focusBar}>
+             <View style={[styles.focusInner, { width: `${gameState.MentalFocus}%`, backgroundColor: '#FF4444', shadowColor: '#FF4444', boxShadow: '0 0 15px #FF4444' }]} />
+           </View>
         </View>
       </View>
 
@@ -284,7 +424,7 @@ export default function GameDashboard() {
       </TouchableOpacity>
 
       {battleResult && (
-        <View style={[styles.battleAlertPro, { backgroundColor: battleResult.result === 'win' ? 'rgba(0, 255, 136, 0.9)' : 'rgba(255, 68, 68, 0.9)' }]}>
+        <View style={[styles.battleAlertPro, { backgroundColor: battleResult.result === 'win' ? 'rgba(0, 255, 136, 0.9)' : 'rgba(255, 68, 68, 0.9)', ...Platform.select({ web: { backdropFilter: 'blur(10px)' } }) }]}>
           <Text style={styles.alertTextPro}>{battleResult.msg}</Text>
         </View>
       )}
@@ -294,7 +434,7 @@ export default function GameDashboard() {
   const renderGuide = () => (
     <View style={styles.guideOverlay}>
       <View style={styles.guideContent}>
-        <Text style={styles.guideHeader}>📜 Guru's Guidance</Text>
+        <Text style={styles.guideHeader}>📜 Guru&apos;s Guidance</Text>
         <ScrollView style={styles.guideScroll}>
           <Text style={styles.guideSub}>1. Vastu Mandala (Building)</Text>
           <Text style={styles.guideText}>• Place Mandira in NE (Ishanya) for Divine Shakti.{"\n"}• Place Krishi Farm in NW (Vayuvya) for maximum Anna.</Text>
@@ -362,7 +502,7 @@ export default function GameDashboard() {
 
       <View style={styles.armyCard}>
         <Text style={styles.healthHeader}>🧠 Manas (Mind) Training</Text>
-        <Text style={styles.guideText}>• Ekagrata (Concentration): Focus on the center icon for 30s to reset "Tilt".{"\n"}• Bhramari: Close ears and hum for 10 reps to lower stress after a defeat.{"\n"}• Cognitive Clarity: Visualize your city's mandala before any Dharma Yuddha.</Text>
+        <Text style={styles.guideText}>• Ekagrata (Concentration): Focus on the center icon for 30s to reset &quot;Tilt&quot;.{"\n"}• Bhramari: Close ears and hum for 10 reps to lower stress after a defeat.{"\n"}• Cognitive Clarity: Visualize your city&apos;s mandala before any Dharma Yuddha.</Text>
         <TouchableOpacity style={styles.meditateBtn} onPress={performMeditation}>
           <Text style={styles.meditateBtnText}>START FOCUS SESSION (2 Min)</Text>
         </TouchableOpacity>
@@ -387,7 +527,11 @@ export default function GameDashboard() {
   );
 
   const constructBuilding = (buildingId: string) => {
+    triggerTapFeedback();
     if (selectedCell === null) return;
+    if (!isOnline) {
+      queueForSync('build', { buildingId, cellId: selectedCell });
+    }
 
     setGameState(prev => {
       const building = prev.Buildings.find(b => b.id === buildingId);
@@ -448,7 +592,21 @@ export default function GameDashboard() {
       </View>
 
       <View style={styles.mandalaContainer}>
-        <View style={styles.mandalaGrid}>
+        {/* Unity 3D Engine Frame (Visualizer) */}
+        {Platform.OS === 'web' && isCinemaMode && (
+          <View style={styles.unityContainer}>
+            <View style={styles.unityOverlay}>
+              <Text style={styles.unityStatus}>UNITY 6.0 ENGINE • CONNECTED</Text>
+            </View>
+            {/* This will be your real Unity WebGL build once export is complete */}
+            <View style={styles.unityPlaceholder}>
+               <Ionicons name="cube-outline" size={60} color="rgba(0, 240, 255, 0.2)" />
+               <Text style={styles.unityText}>3D VASTU MANDALA READY</Text>
+            </View>
+          </View>
+        )}
+
+        <View style={[styles.mandalaGrid, isCinemaMode && { opacity: 0.1 }]}>
           {/* Background Atma Orb */}
           <Reanimated.View style={[styles.atmaOrb, animatedOrb]} />
 
@@ -526,6 +684,24 @@ export default function GameDashboard() {
 
     return (
       <View style={styles.warRoom}>
+        <View style={styles.esportsPolicyCard}>
+          <Text style={styles.esportsPolicyTitle}>Cross-Platform Competitive Profile</Text>
+          <Text style={styles.esportsPolicyText}>
+            Platform: {activePlatform.toUpperCase()} • Tick-Rate: {activeBuildProfile.tickRateHz}Hz • Target FPS: {activePerformanceProfile.targetFps}
+          </Text>
+          <Text style={styles.esportsPolicyText}>
+            Queue Policy: {RANKED_POLICY.defaultQueue} • Placement Matches: {RANKED_POLICY.placementMatches}
+          </Text>
+          <Text style={styles.esportsPolicyText}>
+            Spectator Tools: {spectatorFeatures.freeCam ? 'Free-Cam' : 'Locked Cam'} | Outlines {spectatorFeatures.showOutlines ? 'On' : 'Off'} | Replay {spectatorFeatures.instantReplaySeconds}s
+          </Text>
+          {crossProfile && (
+            <Text style={styles.esportsPolicyText}>
+              Cross-Progression: Lvl {crossProfile.seasonLevel} ({crossProfile.seasonXp}/1000 XP) • Linked: {crossProfile.linkedPlatforms.join(', ')}
+            </Text>
+          )}
+        </View>
+
         <View style={styles.battleHeaderPro}>
           <Text style={styles.sectionHeader}>Global Pro Leaderboard</Text>
           <View style={[styles.proBadge, { backgroundColor: '#FFD700' }]}>
@@ -570,93 +746,210 @@ export default function GameDashboard() {
       { name: "Todar Mal", role: "Land (Vastu)", impact: "+10% Build Speed" }
     ];
 
+    const vedas = [
+      { id: 'Rig', name: "RIG VEDA", effect: "Unlock Akshauhini Sainya Power", cost: 1000 },
+      { id: 'Sama', name: "SAMA VEDA", effect: "+50% Mental Focus Regen", cost: 1500 },
+      { id: 'Yajur', name: "YAJUR VEDA", effect: "Double Vastu Building Bonus", cost: 2000 },
+      { id: 'Atharva', name: "ATHARVA VEDA", effect: "Automatic Resource Yield", cost: 3000 },
+    ];
+
+    const unlockVeda = (veda: typeof vedas[0]) => {
+      if (gameState.Suvarna < veda.cost) return;
+      if (gameState.UnlockedVedas.includes(veda.id)) return;
+      setGameState(prev => ({
+        ...prev,
+        Suvarna: prev.Suvarna - veda.cost,
+        UnlockedVedas: [...prev.UnlockedVedas, veda.id],
+        BattleLog: [{ id: Date.now(), text: `DIVINE KNOWLEDGE: ${veda.name} UNLOCKED.`, type: 'system' as const }, ...prev.BattleLog].slice(0, 5)
+      }));
+    };
+
     return (
       <View style={styles.warRoom}>
-        <Text style={styles.sectionHeader}>Sabha: The Royal Darbar</Text>
-        <View style={styles.ministerGrid}>
-          {ministers.map((m, i) => (
-            <View key={i} style={styles.ministerCard}>
-              <MaterialCommunityIcons name="crown" size={30} color="#FFD700" />
-              <Text style={styles.pickerName}>{m.name}</Text>
-              <Text style={styles.lbHeaderCol}>{m.role}</Text>
-              <Text style={styles.lbEloText}>{m.impact}</Text>
-            </View>
-          ))}
+        <View style={styles.battleHeaderPro}>
+           <Text style={styles.sectionHeader}>Sabha: The Four Vedas Tech Tree</Text>
+           <View style={styles.proBadge}><Text style={styles.proBadgeText}>ANCIENT KNOWLEDGE</Text></View>
         </View>
 
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 30 }}>
+          {vedas.map(v => {
+            const isUnlocked = gameState.UnlockedVedas.includes(v.id);
+            return (
+              <TouchableOpacity key={v.id} style={[styles.ministerCard, isUnlocked && { borderColor: '#00FF88' }]} onPress={() => unlockVeda(v)}>
+                <MaterialCommunityIcons name={isUnlocked ? "script-text" : "script-text-outline"} size={30} color={isUnlocked ? "#00FF88" : "#FFD700"} />
+                <Text style={styles.pickerName}>{v.name}</Text>
+                <Text style={styles.lbHeaderCol}>{v.effect}</Text>
+                <Text style={styles.lbEloText}>{isUnlocked ? "KNOWLEDGE ACQUIRED" : `COST: ${v.cost} GOLD`}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+
         <View style={styles.petitionCard}>
-          <Text style={styles.healthHeader}>📜 Citizen Petition</Text>
-          <Text style={styles.guideText}>"The farmers of Vayuvya seek a tax relief due to the recent monsoon delay. How shall we proceed?"</Text>
-          <View style={styles.petitionActions}>
-            <TouchableOpacity style={styles.trainButtonPro} onPress={() => Alert.alert("Sabha", "Dharma +10: You showed mercy.")}>
-              <Text style={styles.trainTextPro}>GRANT RELIEF</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.trainButtonPro, { backgroundColor: '#FF4444' }]} onPress={() => Alert.alert("Sabha", "Suvarna +500: Treasury enriched.")}>
-              <Text style={styles.trainTextPro}>DENY RELIEF</Text>
-            </TouchableOpacity>
+          <Text style={styles.healthHeader}>📜 Active Ministers (Darbar)</Text>
+          <View style={styles.ministerGrid}>
+            {ministers.map((m, i) => (
+              <View key={i} style={styles.ministerCard}>
+                <MaterialCommunityIcons name="crown" size={30} color="#FFD700" />
+                <Text style={styles.pickerName}>{m.name}</Text>
+                <Text style={styles.lbHeaderCol}>{m.role}</Text>
+              </View>
+            ))}
           </View>
         </View>
       </View>
     );
   };
 
+  const renderLoreCodex = () => (
+    <View style={styles.warRoom}>
+      <View style={styles.battleHeaderPro}>
+        <Text style={styles.sectionHeader}>Lore Codex: Rise of the Realms</Text>
+        <View style={[styles.proBadge, { backgroundColor: '#00F0FF' }]}>
+          <Text style={[styles.proBadgeText, { color: '#000' }]}>WORLD BUILD</Text>
+        </View>
+      </View>
+
+      <View style={styles.petitionCard}>
+        <Text style={styles.healthHeader}>Civilization Progression</Text>
+        {SOCIAL_PROGRESSION_PATH.map((tier) => (
+          <View key={tier.stage} style={styles.loreRow}>
+            <Text style={styles.loreTitle}>Stage {tier.stage}: {tier.title}</Text>
+            <Text style={styles.loreText}>{tier.unlock}</Text>
+          </View>
+        ))}
+      </View>
+
+      <View style={styles.petitionCard}>
+        <Text style={styles.healthHeader}>Four Vedas Knowledge Path</Text>
+        {FOUR_VEDAS_KNOWLEDGE.map((entry) => (
+          <View key={entry.title} style={styles.loreRow}>
+            <Text style={styles.loreTitle}>{entry.title}</Text>
+            <Text style={styles.loreText}>Focus: {entry.focus}</Text>
+            <Text style={styles.loreText}>Gameplay: {entry.gameplayValue}</Text>
+          </View>
+        ))}
+      </View>
+
+      <View style={styles.petitionCard}>
+        <Text style={styles.healthHeader}>Epic Story Arcs</Text>
+        {EPIC_STORY_ARCS.map((entry) => (
+          <View key={entry.title} style={styles.loreRow}>
+            <Text style={styles.loreTitle}>{entry.title}</Text>
+            <Text style={styles.loreText}>Theme: {entry.focus}</Text>
+            <Text style={styles.loreText}>In-game Arc: {entry.gameplayValue}</Text>
+          </View>
+        ))}
+      </View>
+
+      <View style={styles.petitionCard}>
+        <Text style={styles.healthHeader}>Rudra Forms and Family</Text>
+        {RUDRA_FORMS.map((entry) => (
+          <View key={entry.title} style={styles.loreRow}>
+            <Text style={styles.loreTitle}>{entry.title}</Text>
+            <Text style={styles.loreText}>Aspect: {entry.focus}</Text>
+            <Text style={styles.loreText}>Power: {entry.gameplayValue}</Text>
+          </View>
+        ))}
+        {RUDRA_FAMILY_STORY.map((entry) => (
+          <View key={entry.title} style={styles.loreRow}>
+            <Text style={styles.loreTitle}>{entry.title}</Text>
+            <Text style={styles.loreText}>Story Role: {entry.focus}</Text>
+            <Text style={styles.loreText}>Gameplay Link: {entry.gameplayValue}</Text>
+          </View>
+        ))}
+      </View>
+
+      <View style={styles.petitionCard}>
+        <Text style={styles.healthHeader}>Ancient India to World Harmony (Final Arc)</Text>
+        {WORLD_UNITY_ARCS.map((entry) => (
+          <View key={entry.title} style={styles.loreRow}>
+            <Text style={styles.loreTitle}>{entry.title}</Text>
+            <Text style={styles.loreText}>Vision: {entry.focus}</Text>
+            <Text style={styles.loreText}>Endgame System: {entry.gameplayValue}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+
   if (!isMounted) return null;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['right', 'left', 'bottom']}>
       <View style={styles.tournamentTicker}>
-        <Text style={styles.tickerText}>🏆 LIVE TOURNAMENT: ARYAVARTA PRIME OPEN | PRIZE: 1.5M SUVARNA | CURRENT LEAD: KRISHNA_77</Text>
+        <Text style={styles.tickerText}>🏆 LIVE TOURNAMENT: ARYAVARTA PRIME OPEN | {activeBuildProfile.tickRateHz}Hz SERVERS | CURRENT LEAD: KRISHNA_77</Text>
+      </View>
+      <View style={[styles.connectionBanner, isOnline ? styles.connectionBannerOnline : styles.connectionBannerOffline]}>
+        <Text style={styles.connectionText}>
+          {isOnline ? 'ONLINE STABLE' : 'OFFLINE MODE ACTIVE'} • Pending Sync: {pendingSyncActions.length} • {bestEffortMode ? 'BEST-EFFORT PERFORMANCE' : 'FULL VISUAL MODE'}
+        </Text>
       </View>
 
       <View style={isDesktop ? styles.desktopLayout : styles.mobileLayout}>
-        <View style={isDesktop ? styles.sidebar : styles.topNav}>
-          <View style={styles.logoContainer}>
-            <Image source={{ uri: 'https://images.unsplash.com/photo-1614027164847-1b2809eb18bc?q=80&w=200' }} style={styles.proLogo} />
-            <View>
+        <View style={isDesktop ? styles.sidebar : styles.mobileNav}>
+          {!isDesktop && (
+            <View style={styles.mobileBrand}>
               <Text style={styles.headerTitlePro}>EVOLUTION</Text>
-              <Text style={styles.headerSubPro}>STUDIOS • DEVA YUDDHA</Text>
+              <Reanimated.View style={[styles.statusDot, animatedGlow]} />
             </View>
-          </View>
-
-          <View style={styles.navSection}>
+          )}
+          
+          <View style={isDesktop ? styles.navSection : styles.mobileNavInner}>
             <TouchableOpacity onPress={() => setActiveTab('VastuBuilder')} style={[styles.navItemPro, activeTab === 'VastuBuilder' && styles.navItemActivePro]}>
-              <Entypo name="grid" size={16} color={activeTab === 'VastuBuilder' ? "#00F0FF" : "#666"} />
-              <Text style={[styles.navTextPro, activeTab === 'VastuBuilder' && styles.navTextActivePro]}>{t('territory')}</Text>
+              <Entypo name="grid" size={isDesktop ? 16 : 20} color={activeTab === 'VastuBuilder' ? "#00F0FF" : "#666"} />
+              {isDesktop && <Text style={[styles.navTextPro, activeTab === 'VastuBuilder' && styles.navTextActivePro]}>{t('territory')}</Text>}
             </TouchableOpacity>
             <TouchableOpacity onPress={() => setActiveTab('Sabha')} style={[styles.navItemPro, activeTab === 'Sabha' && styles.navItemActivePro]}>
-              <MaterialCommunityIcons name="account-group" size={16} color={activeTab === 'Sabha' ? "#FFD700" : "#666"} />
-              <Text style={[styles.navTextPro, activeTab === 'Sabha' && styles.navTextActivePro]}>{t('sabha')}</Text>
+              <MaterialCommunityIcons name="account-group" size={isDesktop ? 16 : 20} color={activeTab === 'Sabha' ? "#FFD700" : "#666"} />
+              {isDesktop && <Text style={[styles.navTextPro, activeTab === 'Sabha' && styles.navTextActivePro]}>{t('sabha')}</Text>}
             </TouchableOpacity>
             <TouchableOpacity onPress={() => setActiveTab('DharmaYuddha')} style={[styles.navItemPro, activeTab === 'DharmaYuddha' && styles.navItemActivePro]}>
-              <MaterialCommunityIcons name="radar" size={16} color={activeTab === 'DharmaYuddha' ? "#FF4444" : "#666"} />
-              <Text style={[styles.navTextPro, activeTab === 'DharmaYuddha' && styles.navTextActivePro]}>{t('war')}</Text>
+              <MaterialCommunityIcons name="sword-cross" size={isDesktop ? 16 : 20} color={activeTab === 'DharmaYuddha' ? "#FF4444" : "#666"} />
+              {isDesktop && <Text style={[styles.navTextPro, activeTab === 'DharmaYuddha' && styles.navTextActivePro]}>{t('war')}</Text>}
             </TouchableOpacity>
             <TouchableOpacity onPress={() => setActiveTab('VedicHealth')} style={[styles.navItemPro, activeTab === 'VedicHealth' && styles.navItemActivePro]}>
-              <MaterialCommunityIcons name="leaf" size={16} color={activeTab === 'VedicHealth' ? "#00FF88" : "#666"} />
-              <Text style={[styles.navTextPro, activeTab === 'VedicHealth' && styles.navTextActivePro]}>{t('health')}</Text>
+              <FontAwesome5 name="heartbeat" size={isDesktop ? 14 : 18} color={activeTab === 'VedicHealth' ? "#00FF88" : "#666"} />
+              {isDesktop && <Text style={[styles.navTextPro, activeTab === 'VedicHealth' && styles.navTextActivePro]}>{t('health')}</Text>}
             </TouchableOpacity>
             <TouchableOpacity onPress={() => setActiveTab('Multiplayer')} style={[styles.navItemPro, activeTab === 'Multiplayer' && styles.navItemActivePro]}>
-              <MaterialCommunityIcons name="trophy-variant" size={16} color={activeTab === 'Multiplayer' ? "#FFD700" : "#666"} />
-              <Text style={[styles.navTextPro, activeTab === 'Multiplayer' && styles.navTextActivePro]}>{t('pro')}</Text>
+              <MaterialCommunityIcons name="trophy-variant" size={isDesktop ? 16 : 20} color={activeTab === 'Multiplayer' ? "#FFD700" : "#666"} />
+              {isDesktop && <Text style={[styles.navTextPro, activeTab === 'Multiplayer' && styles.navTextActivePro]}>{t('pro')}</Text>}
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setActiveTab('LoreCodex')} style={[styles.navItemPro, activeTab === 'LoreCodex' && styles.navItemActivePro]}>
+              <MaterialCommunityIcons name="book-open-page-variant" size={isDesktop ? 16 : 20} color={activeTab === 'LoreCodex' ? "#00F0FF" : "#666"} />
+              {isDesktop && <Text style={[styles.navTextPro, activeTab === 'LoreCodex' && styles.navTextActivePro]}>LORE</Text>}
             </TouchableOpacity>
           </View>
 
-          <View style={styles.langSwitcher}>
-            {['EN', 'HI', 'SAN', 'ES'].map(lang => (
-              <TouchableOpacity key={lang} onPress={() => setLanguage(lang as any)} style={[styles.langBtn, language === lang && styles.langBtnActive]}>
-                <Text style={[styles.langText, language === lang && styles.langTextActive]}>{lang}</Text>
+          {isDesktop && (
+            <>
+              <View style={styles.langSwitcher}>
+                {['EN', 'HI', 'SAN', 'ES'].map(lang => (
+                  <TouchableOpacity key={lang} onPress={() => setLanguage(lang as any)} style={[styles.langBtn, language === lang && styles.langBtnActive]}>
+                    <Text style={[styles.langText, language === lang && styles.langTextActive]}>{lang}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <View style={styles.proProfile}>
+                <View style={styles.heroWrapper}>
+                  <Image source={{ uri: 'https://images.unsplash.com/photo-1578632292335-df3abbb0d586?q=80&w=200' }} style={styles.heroImage} />
+                  <Reanimated.View style={[styles.heroGlow, animatedGlow]} />
+                  <View style={styles.heroOverlay} />
+                </View>
+                <View style={styles.heroInfo}>
+                  <Text style={styles.proRankLabel}>COMMANDER</Text>
+                  <Text style={styles.heroName}>ARJUNA_DEV</Text>
+                  <Reanimated.Text style={[styles.proRankVal, animatedGlow]}>{gameState.GlobalRank}</Reanimated.Text>
+                </View>
+              </View>
+
+              <TouchableOpacity onPress={() => setShowGuide(true)} style={styles.guideBtnSidePro}>
+                <Text style={styles.guideBtnTextPro}>📜 {t('guide')}</Text>
               </TouchableOpacity>
-            ))}
-          </View>
-
-          <View style={styles.proProfile}>
-            <Text style={styles.proRankLabel}>{t('rank')}</Text>
-            <Reanimated.Text style={[styles.proRankVal, animatedGlow]}>{gameState.GlobalRank}</Reanimated.Text>
-          </View>
-
-          <TouchableOpacity onPress={() => setShowGuide(true)} style={styles.guideBtnSidePro}>
-            <Text style={styles.guideBtnTextPro}>📜 {t('guide')}</Text>
-          </TouchableOpacity>
+            </>
+          )}
         </View>
 
         <View style={styles.content}>
@@ -684,12 +977,15 @@ export default function GameDashboard() {
               {activeTab === 'DharmaYuddha' && renderDharmaYuddha()}
               {activeTab === 'VedicHealth' && renderVedicHealth()}
               {activeTab === 'Multiplayer' && renderProLeague()}
+              {activeTab === 'LoreCodex' && renderLoreCodex()}
 
               {/* Divine Scanline HUD Overlay */}
-              <Reanimated.View
-                pointerEvents="none"
-                style={[styles.scanLineOverlay, animatedScan]}
-              />
+              {!bestEffortMode && (
+                <Reanimated.View
+                  pointerEvents="none"
+                  style={[styles.scanLineOverlay, animatedScan]}
+                />
+              )}
             </View>
           </ScrollView>
 
@@ -719,11 +1015,26 @@ export default function GameDashboard() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles: any = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#020408' },
   desktopLayout: { flex: 1, flexDirection: 'row' },
-  mobileLayout: { flex: 1, flexDirection: 'column' },
-  sidebar: {
+  mobileLayout: { flex: 1, flexDirection: 'column-reverse' },
+  mobileNav: { 
+    backgroundColor: 'rgba(18, 22, 29, 0.98)', 
+    borderTopWidth: 1, 
+    borderTopColor: 'rgba(0, 240, 255, 0.3)', 
+    padding: 15,
+    paddingBottom: Platform.OS === 'ios' ? 30 : 15,
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    ...Platform.select({
+      web: { backdropFilter: 'blur(15px)' }
+    })
+  },
+  mobileNavInner: { flexDirection: 'row', justifyContent: 'space-around', width: '100%' },
+  mobileBrand: { position: 'absolute', top: -60, left: 20, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  statusDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#00F0FF', shadowColor: '#00F0FF', shadowRadius: 5, shadowOpacity: 0.8 },
+  sidebar: { 
     width: 300,
     backgroundColor: 'rgba(18, 22, 29, 0.95)',
     borderRightWidth: 1,
@@ -765,21 +1076,18 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.2,
     shadowRadius: 20,
-    boxShadow: '0 0 20px rgba(0, 240, 255, 0.2)',
+    ...(Platform.OS === 'web' ? ({ boxShadow: '0 0 20px rgba(0, 240, 255, 0.2)' } as any) : {}),
     transform: [{ skewX: '-10deg' }]
   },
   statLabel: { color: 'rgba(0, 240, 255, 0.6)', fontSize: 10, fontWeight: '900', letterSpacing: 2.5, textTransform: 'uppercase' },
 
   gridSubHeader: { color: '#666', fontSize: 11, fontWeight: 'bold', marginTop: 4, letterSpacing: 1 },
-  statValue: {
-    // Your existing properties (e.g., fontSize, color)
-    fontSize: 16,
-    color: 'white',
-
-    // Replace the single 'textShadow' line with these three:
-    textShadowColor: 'rgba(0, 0, 0, 0.5)',
-    textShadowOffset: { width: 2, height: 2 },
-    textShadowRadius: 4,
+  statValue: { 
+    color: '#FFF', 
+    fontSize: 28, 
+    fontWeight: '900', 
+    marginTop: 5, 
+    ...(Platform.OS === 'web' ? ({ textShadow: '0 0 10px #00F0FF' } as any) : {})
   },
   gridHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   cinemaToggle: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(255, 215, 0, 0.1)', paddingHorizontal: 15, paddingVertical: 8, borderRadius: 20 },
@@ -867,6 +1175,10 @@ const styles = StyleSheet.create({
 
   tournamentTicker: { backgroundColor: '#FFD700', paddingVertical: 6 },
   tickerText: { color: '#000', fontSize: 10, fontWeight: '900', textAlign: 'center', letterSpacing: 1 },
+  connectionBanner: { paddingVertical: 6, paddingHorizontal: 12, borderBottomWidth: 1 },
+  connectionBannerOnline: { backgroundColor: 'rgba(0, 255, 136, 0.12)', borderBottomColor: 'rgba(0, 255, 136, 0.3)' },
+  connectionBannerOffline: { backgroundColor: 'rgba(255, 68, 68, 0.15)', borderBottomColor: 'rgba(255, 68, 68, 0.4)' },
+  connectionText: { color: '#DDE7EE', fontSize: 10, fontWeight: '800', textAlign: 'center', letterSpacing: 1 },
 
   logoContainer: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 40 },
   proLogo: { width: 44, height: 44, borderRadius: 10, borderColor: '#00F0FF', borderWidth: 1 },
@@ -886,22 +1198,34 @@ const styles = StyleSheet.create({
   guideBtnSidePro: { padding: 15, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,215,0,0.3)', alignItems: 'center' },
   guideBtnTextPro: { color: '#FFD700', fontSize: 12, fontWeight: 'bold' },
 
-  mainContainerPro: { padding: Platform.OS === 'web' ? 40 : 20, maxWidth: 1200, alignSelf: 'center', width: '100%' },
-  topResourceRowPro: { flexDirection: 'row', flexWrap: 'wrap', gap: 15, marginBottom: 30 },
+  mainContainerPro: { 
+    padding: Platform.OS === 'web' ? 40 : 15, 
+    maxWidth: 1200, 
+    alignSelf: 'center', 
+    width: '100%',
+    paddingTop: 20
+  },
+  topResourceRowPro: { 
+    flexDirection: 'row', 
+    gap: 10, 
+    marginBottom: 20,
+    width: '100%',
+    flexWrap: 'nowrap',
+    overflow: 'hidden'
+  },
   resMiniPro: {
-    minWidth: 100,
-    flex: 1,
     padding: 16,
-    borderRadius: 4,
-    backgroundColor: 'rgba(10, 13, 18, 0.9)',
-    borderLeftWidth: 4,
+    borderRadius: 8,
+    backgroundColor: 'rgba(10, 13, 18, 0.95)',
+    borderLeftWidth: 3,
     borderLeftColor: '#00F0FF',
     borderWidth: 1,
     borderColor: 'rgba(0, 240, 255, 0.2)',
-    transform: [{ skewX: '-10deg' }],
+    transform: [{ skewX: '-8deg' }],
+    flex: 1
   },
-  resLabelPro: { color: 'rgba(0, 240, 255, 0.6)', fontSize: 8, fontWeight: 'bold', marginBottom: 6, letterSpacing: 1.5, textTransform: 'uppercase' },
-  resValPro: { color: '#FFF', fontSize: 24, fontWeight: '900', letterSpacing: 1 },
+  resLabelPro: { color: 'rgba(0, 240, 255, 0.6)', fontSize: 8, fontWeight: 'bold', marginBottom: 4, letterSpacing: 1, textTransform: 'uppercase' },
+  resValPro: { color: '#FFF', fontSize: 24, fontWeight: '900' },
 
   battleHeaderPro: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   proBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 4, backgroundColor: '#FF4444' },
@@ -921,6 +1245,9 @@ const styles = StyleSheet.create({
   alertTextPro: { fontWeight: '900', fontSize: 14, letterSpacing: 1 },
 
   leaderboardCard: { backgroundColor: '#1C2128', borderRadius: 24, padding: 15, borderWidth: 1, borderColor: '#30363D' },
+  esportsPolicyCard: { backgroundColor: 'rgba(0, 240, 255, 0.06)', borderRadius: 16, padding: 14, marginBottom: 16, borderWidth: 1, borderColor: 'rgba(0, 240, 255, 0.2)' },
+  esportsPolicyTitle: { color: '#00F0FF', fontSize: 12, fontWeight: '900', marginBottom: 6, letterSpacing: 1 },
+  esportsPolicyText: { color: '#A3DCEF', fontSize: 10, fontWeight: '700', marginBottom: 2 },
   leaderboardHeader: { flexDirection: 'row', paddingBottom: 15, borderBottomWidth: 1, borderBottomColor: '#30363D', marginBottom: 10 },
   lbHeaderCol: { flex: 1, color: '#666', fontSize: 10, fontWeight: 'bold' },
   lbRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)' },
@@ -992,6 +1319,9 @@ const styles = StyleSheet.create({
   ministerGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 15, marginTop: 20 },
   ministerCard: { flex: 1, minWidth: 150, backgroundColor: '#12161D', padding: 20, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,215,0,0.2)', alignItems: 'center' },
   petitionCard: { marginTop: 30, backgroundColor: 'rgba(255, 215, 0, 0.05)', padding: 30, borderRadius: 24, borderWidth: 1, borderColor: '#FFD700' },
+  loreRow: { marginBottom: 12, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)' },
+  loreTitle: { color: '#FFF', fontSize: 13, fontWeight: '900', marginBottom: 4 },
+  loreText: { color: '#B8C2CC', fontSize: 12, lineHeight: 18 },
   petitionActions: { flexDirection: 'row', gap: 15, marginTop: 25 },
   langSwitcher: { flexDirection: 'row', gap: 8, marginVertical: 20, flexWrap: 'wrap' },
   langBtn: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: '#333' },
@@ -1018,4 +1348,77 @@ const styles = StyleSheet.create({
     opacity: 0.5,
     zIndex: -2,
   },
+  heroWrapper: {
+    width: '100%',
+    height: 120,
+    borderRadius: 20,
+    overflow: 'hidden',
+    marginBottom: 15,
+    backgroundColor: '#000',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 240, 255, 0.4)'
+  },
+  heroImage: { width: '100%', height: '100%', opacity: 0.8 },
+  heroOverlay: { 
+    ...StyleSheet.absoluteFillObject, 
+    backgroundColor: 'rgba(0, 240, 255, 0.1)',
+    borderTopWidth: 2,
+    borderTopColor: 'rgba(255, 255, 255, 0.3)'
+  },
+  heroGlow: {
+    position: 'absolute',
+    bottom: -20,
+    right: -20,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#00F0FF',
+    shadowColor: '#00F0FF',
+    shadowRadius: 30,
+    shadowOpacity: 1,
+    opacity: 0.3
+  },
+  heroInfo: { alignItems: 'center' },
+  heroName: { 
+    color: '#FFF', 
+    fontSize: 18, 
+    fontWeight: '900', 
+    letterSpacing: 2, 
+    marginVertical: 4, 
+    textShadowColor: '#00F0FF', 
+    textShadowRadius: 10,
+    ...(Platform.OS === 'web' ? ({ textShadow: '0 0 10px #00F0FF' } as any) : {})
+  },
+  unityContainer: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#000',
+    borderRadius: 32,
+    zIndex: 50,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#00F0FF'
+  },
+  unityOverlay: {
+    position: 'absolute',
+    top: 20,
+    left: 20,
+    zIndex: 100,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderColor: 'rgba(0, 240, 255, 0.3)',
+    borderWidth: 1
+  },
+  unityStatus: { color: '#00F0FF', fontSize: 9, fontWeight: '900', letterSpacing: 2 },
+  unityPlaceholder: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  unityText: { color: 'rgba(0, 240, 255, 0.4)', fontSize: 12, fontWeight: 'bold', marginTop: 15, letterSpacing: 3 },
+  divineBloom: {
+    shadowColor: '#FF4444',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center'
+  }
 });

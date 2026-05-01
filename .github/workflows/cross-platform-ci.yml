@@ -1,0 +1,40 @@
+name: Cross Platform CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  verify-app:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Tenjiku-Universal-App
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: Tenjiku-Universal-App/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint + Typecheck
+        run: npm run verify:esports
+
+      - name: Server smoke test
+        run: node -e "require('./server/server.js'); setTimeout(() => process.exit(0), 1200);"
+
+      - name: Matchmaking load simulation
+        run: |
+          node ./server/server.js &
+          SERVER_PID=$!
+          sleep 2
+          npm run loadtest:server
+          kill $SERVER_PID
