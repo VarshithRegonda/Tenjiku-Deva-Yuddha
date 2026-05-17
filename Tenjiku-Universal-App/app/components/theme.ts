@@ -60,5 +60,5 @@ export const webShadow = (color: string, spread = 20, size = 0) =>
     : undefined;
 
 /** Web-only style object — returns {} on native */
-export const web = (style: Record<string, unknown>): Record<string, unknown> =>
+export const web = (style: Record<string, unknown>): any =>
   Platform.OS === 'web' ? style : {};
