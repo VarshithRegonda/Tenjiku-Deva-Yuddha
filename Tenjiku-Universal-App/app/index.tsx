@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Image, Platform, Alert, Animated as BaseAnimated, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Reanimated, { useSharedValue, useAnimatedStyle, withRepeat, withTiming, interpolate } from 'react-native-reanimated';
+import Reanimated, { useSharedValue, useAnimatedStyle, withRepeat, withTiming, interpolate, withSpring, Easing } from 'react-native-reanimated';
 import { FontAwesome5, MaterialCommunityIcons, Ionicons, Entypo } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { BUILD_PROFILES, RANKED_POLICY, resolvePlatformTarget } from '@/src/esports/config';
@@ -177,6 +177,10 @@ export default function GameDashboard() {
   const glowValue = useSharedValue(0.4);
   const scanLine = useSharedValue(-200);
   const rotation = useSharedValue(0);
+  const battleFlashOpacity = useSharedValue(0);
+  const chakraBreathe = useSharedValue(1);
+  const headerGlowAnim = useSharedValue(0);
+  const [battleVfxResult, setBattleVfxResult] = React.useState<'win'|'loss'|null>(null);
 
   // Persistence & Data Recovery Logic
   React.useEffect(() => {
@@ -218,8 +222,118 @@ export default function GameDashboard() {
     glowValue.value = withRepeat(withTiming(1, { duration: 2500 }), -1, true);
     scanLine.value = withRepeat(withTiming(800, { duration: 5000 }), -1, false);
     rotation.value = withRepeat(withTiming(360, { duration: 20000 }), -1, false);
-    // Reanimated shared values are stable refs; run once on mount.
+    chakraBreathe.value = withRepeat(withTiming(1.08, { duration: 4000, easing: Easing.inOut(Easing.sin) }), -1, true);
+    headerGlowAnim.value = withRepeat(withTiming(1, { duration: 3000 }), -1, true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── DIVINE VFX: CSS Keyframe + DOM Injection (Web Only) ──────────────────
+  React.useEffect(() => {
+    if (Platform.OS !== 'web' || typeof document === 'undefined') return;
+    const styleId = 'tdv-vfx-styles';
+    if (!document.getElementById(styleId)) {
+      const s = document.createElement('style');
+      s.id = styleId;
+      s.innerHTML = `
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;900&display=swap');
+        @keyframes tdvGodRay { 0%{transform:rotate(0deg) scale(1);opacity:.04} 50%{opacity:.09} 100%{transform:rotate(360deg) scale(1.1);opacity:.04} }
+        @keyframes tdvChakraSpin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+        @keyframes tdvChakraCounter { from{transform:rotate(360deg)} to{transform:rotate(0deg)} }
+        @keyframes tdvLotusPulse { 0%,100%{transform:scale(1) rotate(0deg);opacity:.05} 50%{transform:scale(1.18) rotate(180deg);opacity:.12} }
+        @keyframes tdvParticleRise { 0%{transform:translateY(0) scale(0);opacity:0} 10%{opacity:1} 90%{opacity:.7} 100%{transform:translateY(-100vh) translateX(var(--drift,30px)) scale(2);opacity:0} }
+        @keyframes tdvGlyphDrift { 0%{transform:translateY(0) rotate(0deg);opacity:0} 15%{opacity:.25} 85%{opacity:.12} 100%{transform:translateY(-90px) translateX(25px) rotate(12deg);opacity:0} }
+        @keyframes tdvScanHUD { 0%{top:-3px} 100%{top:100%} }
+        @keyframes tdvBattleFlash { 0%{opacity:0} 15%{opacity:.75} 100%{opacity:0} }
+        @keyframes tdvEmberRise { 0%{transform:translateY(0) scale(1);opacity:1} 100%{transform:translateY(-140px) translateX(var(--ex,10px)) scale(.1);opacity:0} }
+        @keyframes tdvAuraBreathe { 0%,100%{box-shadow:0 0 30px 5px rgba(0,240,255,.12),0 0 80px 15px rgba(0,240,255,.04)} 50%{box-shadow:0 0 60px 15px rgba(0,240,255,.28),0 0 120px 30px rgba(255,215,0,.07)} }
+        @keyframes tdvGoldShimmer { 0%{background-position:-200% center} 100%{background-position:200% center} }
+        @keyframes tdvCellPulse { 0%,100%{box-shadow:0 0 8px rgba(0,240,255,.08)} 50%{box-shadow:0 0 22px rgba(0,240,255,.35),inset 0 0 12px rgba(0,240,255,.08)} }
+        @keyframes tdvBattleThrob { 0%,100%{box-shadow:0 0 20px rgba(255,68,68,.45);transform:skewX(-10deg) scale(1)} 50%{box-shadow:0 0 45px rgba(255,68,68,.9),0 0 80px rgba(255,68,68,.25);transform:skewX(-10deg) scale(1.025)} }
+        .tdv-vfx-layer{position:fixed;top:0;left:0;width:100vw;height:100vh;pointer-events:none;z-index:0;overflow:hidden}
+        .tdv-god-ray{position:absolute;top:50%;left:50%;width:220vmax;height:220vmax;margin-top:-110vmax;margin-left:-110vmax;background:conic-gradient(from 0deg,transparent 0deg,rgba(255,215,0,.03) 2deg,transparent 5deg,transparent 45deg,rgba(0,240,255,.025) 47deg,transparent 50deg,transparent 90deg,rgba(255,215,0,.035) 92deg,transparent 95deg,transparent 135deg,rgba(0,240,255,.02) 137deg,transparent 140deg,transparent 180deg,rgba(255,215,0,.03) 182deg,transparent 185deg,transparent 225deg,rgba(0,240,255,.025) 227deg,transparent 230deg,transparent 270deg,rgba(255,215,0,.035) 272deg,transparent 275deg,transparent 315deg,rgba(0,240,255,.02) 317deg,transparent 320deg);animation:tdvGodRay 80s linear infinite}
+        .tdv-lotus-bg{position:absolute;top:50%;left:50%;width:95vmin;height:95vmin;margin-top:-47.5vmin;margin-left:-47.5vmin;background:radial-gradient(ellipse at center,rgba(255,215,0,.04) 0%,rgba(0,240,255,.025) 35%,rgba(255,68,68,.01) 60%,transparent 75%);animation:tdvLotusPulse 10s ease-in-out infinite}
+        .tdv-chakra-ring{position:absolute;top:50%;left:50%;border-radius:50%;border-style:solid;border-color:transparent}
+        .tdv-chakra-outer{width:85vmin;height:85vmin;margin-top:-42.5vmin;margin-left:-42.5vmin;border-width:1px;border-top-color:rgba(255,215,0,.07);border-right-color:rgba(0,240,255,.05);animation:tdvChakraSpin 35s linear infinite}
+        .tdv-chakra-mid{width:65vmin;height:65vmin;margin-top:-32.5vmin;margin-left:-32.5vmin;border-width:1px;border-top-color:rgba(0,240,255,.09);border-left-color:rgba(255,68,68,.05);animation:tdvChakraCounter 22s linear infinite}
+        .tdv-chakra-inner{width:45vmin;height:45vmin;margin-top:-22.5vmin;margin-left:-22.5vmin;border-width:1px;border-top-color:rgba(255,215,0,.11);border-right-color:rgba(0,240,255,.07);animation:tdvChakraSpin 14s linear infinite}
+        .tdv-particle{position:absolute;bottom:0;border-radius:50%;animation:tdvParticleRise linear infinite}
+        .tdv-glyph{position:absolute;font-family:'Noto Sans Devanagari',sans-serif;color:rgba(255,215,0,.2);animation:tdvGlyphDrift ease-in-out infinite;pointer-events:none;user-select:none}
+        .tdv-hud-scan{position:fixed;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,rgba(0,240,255,.5),rgba(255,215,0,.3),rgba(0,240,255,.5),transparent);z-index:9997;pointer-events:none;animation:tdvScanHUD 9s linear infinite}
+        .tdv-battle-flash{position:fixed;inset:0;pointer-events:none;z-index:99998;animation:tdvBattleFlash .65s ease-out forwards}
+        .tdv-battle-flash.win{background:rgba(0,255,136,.28)}
+        .tdv-battle-flash.loss{background:rgba(255,68,68,.32)}
+        .tdv-ember{position:fixed;width:5px;height:5px;border-radius:50%;animation:tdvEmberRise ease-out forwards}
+        .tdv-ticker-gold{background:linear-gradient(90deg,#FFD700 0%,#FFFACD 35%,#FFD700 55%,#B8860B 100%);background-size:250% 100%;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;animation:tdvGoldShimmer 3.5s linear infinite}
+        .tdv-battle-throb{animation:tdvBattleThrob 2.2s ease-in-out infinite}
+        .tdv-aura-breathe{animation:tdvAuraBreathe 3.5s ease-in-out infinite}
+      `;
+      document.head.appendChild(s);
+    }
+
+    // Build VFX DOM Layer
+    const layer = document.createElement('div');
+    layer.className = 'tdv-vfx-layer';
+    layer.id = 'tdv-main-layer';
+
+    const godRay = document.createElement('div'); godRay.className = 'tdv-god-ray'; layer.appendChild(godRay);
+    const lotus = document.createElement('div');  lotus.className  = 'tdv-lotus-bg'; layer.appendChild(lotus);
+    ['tdv-chakra-ring tdv-chakra-outer','tdv-chakra-ring tdv-chakra-mid','tdv-chakra-ring tdv-chakra-inner'].forEach(c => { const d=document.createElement('div'); d.className=c; layer.appendChild(d); });
+
+    const particles = [
+      {l:'8%', sz:3,  col:'#FFD700', dur:9,  delay:0, drift:'22px'},
+      {l:'20%',sz:2,  col:'#00F0FF', dur:13, delay:3, drift:'-28px'},
+      {l:'35%',sz:4,  col:'#FFD700', dur:10, delay:5, drift:'18px'},
+      {l:'50%',sz:2,  col:'#FF4444', dur:16, delay:1, drift:'-22px'},
+      {l:'65%',sz:3,  col:'#00F0FF', dur:11, delay:4, drift:'30px'},
+      {l:'80%',sz:2,  col:'#FFD700', dur:14, delay:2, drift:'-18px'},
+      {l:'92%',sz:3,  col:'#00FF88', dur:8,  delay:6, drift:'25px'},
+      {l:'15%',sz:2,  col:'#00F0FF', dur:12, delay:7, drift:'-35px'},
+      {l:'45%',sz:3,  col:'#FFD700', dur:17, delay:0, drift:'12px'},
+      {l:'72%',sz:4,  col:'#00F0FF', dur:9,  delay:3, drift:'-20px'},
+      {l:'58%',sz:2,  col:'#FF4444', dur:15, delay:8, drift:'38px'},
+      {l:'3%', sz:3,  col:'#FFD700', dur:10, delay:2, drift:'-12px'},
+    ];
+    particles.forEach(p => {
+      const el = document.createElement('div');
+      el.className = 'tdv-particle';
+      el.style.cssText = `left:${p.l};width:${p.sz}px;height:${p.sz}px;background:${p.col};box-shadow:0 0 ${p.sz*3}px ${p.col};animation-duration:${p.dur}s;animation-delay:-${p.delay}s;--drift:${p.drift}`;
+      layer.appendChild(el);
+    });
+
+    const glyphs = ['ॐ','ऋ','श्री','धर्म','ॐ','वेद','॥','शक्ति','युद्ध','ॐ'];
+    glyphs.forEach((g, i) => {
+      const el = document.createElement('div');
+      el.className = 'tdv-glyph';
+      el.textContent = g;
+      el.style.cssText = `left:${5+(i*10)%90}%;bottom:${8+(i*17)%65}%;font-size:${14+(i*3)%14}px;animation-duration:${6+(i*2.1)%9}s;animation-delay:-${(i*1.9)%7}s;opacity:0`;
+      layer.appendChild(el);
+    });
+
+    document.body.insertBefore(layer, document.body.firstChild);
+
+    const scan = document.createElement('div'); scan.className='tdv-hud-scan'; scan.id='tdv-hud-scan'; document.body.appendChild(scan);
+    return () => { layer.remove(); scan.remove(); };
+  }, []);
+
+  // ── Battle VFX trigger ───────────────────────────────────────────────────
+  const triggerBattleVFX = React.useCallback((result: 'win'|'loss') => {
+    setBattleVfxResult(result);
+    setTimeout(() => setBattleVfxResult(null), 700);
+    if (Platform.OS !== 'web' || typeof document === 'undefined') return;
+    const flash = document.createElement('div');
+    flash.className = `tdv-battle-flash ${result}`;
+    document.body.appendChild(flash);
+    setTimeout(() => flash.remove(), 700);
+    if (result === 'win') {
+      for (let i = 0; i < 22; i++) {
+        const e = document.createElement('div');
+        e.className = 'tdv-ember';
+        const col = Math.random() > 0.5 ? '#FFD700' : '#00FF88';
+        e.style.cssText = `left:${25+Math.random()*50}%;bottom:${25+Math.random()*25}%;background:${col};box-shadow:0 0 8px ${col};animation-duration:${0.7+Math.random()*0.8}s;animation-delay:${Math.random()*0.3}s;--ex:${(Math.random()-0.5)*60}px`;
+        document.body.appendChild(e);
+        setTimeout(() => e.remove(), 1600);
+      }
+    }
   }, []);
 
   // Unity Bridge Ref (for future 3D Engine integration)
@@ -248,8 +362,8 @@ export default function GameDashboard() {
 
   const animatedGlow = useAnimatedStyle(() => ({
     opacity: glowValue.value,
-    shadowOpacity: interpolate(glowValue.value, [0.4, 1], [0.1, 0.6]),
-    transform: [{ scale: interpolate(glowValue.value, [0.4, 1], [1, 1.02]) }]
+    shadowOpacity: interpolate(glowValue.value, [0.4, 1], [0.1, 0.7]),
+    transform: [{ scale: interpolate(glowValue.value, [0.4, 1], [1, 1.03]) }]
   }));
 
   const animatedScan = useAnimatedStyle(() => ({
@@ -258,8 +372,21 @@ export default function GameDashboard() {
   }));
 
   const animatedOrb = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${rotation.value}deg` }],
-    backgroundColor: withTiming(isNightCycle ? 'rgba(0, 240, 255, 0.08)' : 'rgba(255, 215, 0, 0.05)', { duration: 2000 })
+    transform: [{ rotate: `${rotation.value}deg` }, { scale: chakraBreathe.value }],
+    backgroundColor: withTiming(isNightCycle ? 'rgba(0, 240, 255, 0.1)' : 'rgba(255, 215, 0, 0.07)', { duration: 2000 })
+  }));
+
+  const animatedChakraGlow = useAnimatedStyle(() => ({
+    transform: [{ scale: chakraBreathe.value }],
+    opacity: interpolate(chakraBreathe.value, [1, 1.08], [0.5, 1]),
+  }));
+
+  const animatedHeaderGlow = useAnimatedStyle(() => ({
+    opacity: interpolate(headerGlowAnim.value, [0, 1], [0.7, 1]),
+    ...(Platform.OS === 'web' ? {
+      textShadowColor: '#FFD700',
+      textShadowRadius: interpolate(headerGlowAnim.value, [0, 1], [8, 28]),
+    } : {})
   }));
 
   const { width } = useWindowDimensions();
@@ -360,23 +487,25 @@ export default function GameDashboard() {
 
     if (playerPower >= enemyPower) {
       const loot = 200 + Math.floor(Math.random() * 300);
+      triggerBattleVFX('win');
       setGameState(prev => ({
         ...prev,
         Suvarna: prev.Suvarna + loot,
-        BattleLog: [{ id: Date.now(), text: `VICTORY! Defeated Invaders. Looted ${loot} Suvarna.`, type: 'combat' as const }, ...prev.BattleLog].slice(0, 5)
+        BattleLog: [{ id: Date.now(), text: `⚡ VICTORY! Defeated Invaders. Looted ${loot} Suvarna.`, type: 'combat' as const }, ...prev.BattleLog].slice(0, 5)
       }));
-      setBattleResult({ result: 'win', msg: `Victory! Your Dharma and Sainya prevailed.` });
+      setBattleResult({ result: 'win', msg: `🏆 Victory! Your Dharma and Sainya prevailed!` });
       if (crossProfile) {
         const updated = grantSeasonXp(crossProfile.playerId, 150);
         if (updated) setCrossProfile({ ...updated });
       }
     } else {
+      triggerBattleVFX('loss');
       setGameState(prev => ({
         ...prev,
         Sainya: Math.max(0, prev.Sainya - 5),
-        BattleLog: [{ id: Date.now(), text: "DEFEAT! Your Sainya retreated.", type: 'combat' as const }, ...prev.BattleLog].slice(0, 5)
+        BattleLog: [{ id: Date.now(), text: "💀 DEFEAT! Your Sainya retreated.", type: 'combat' as const }, ...prev.BattleLog].slice(0, 5)
       }));
-      setBattleResult({ result: 'loss', msg: `Defeat. You need more Sainya or Shakti.` });
+      setBattleResult({ result: 'loss', msg: `⚔️ Defeat. Train more Sainya and Shakti.` });
       if (crossProfile) {
         const updated = grantSeasonXp(crossProfile.playerId, 40);
         if (updated) setCrossProfile({ ...updated });
@@ -419,8 +548,12 @@ export default function GameDashboard() {
         </View>
       </View>
 
-      <TouchableOpacity style={styles.battleButtonPro} onPress={startBattle}>
-        <Text style={styles.battleButtonTextPro}>{t('battle')}</Text>
+      <TouchableOpacity
+        style={styles.battleButtonPro}
+        onPress={startBattle}
+        {...(Platform.OS === 'web' ? { className: 'tdv-battle-throb' } as any : {})}
+      >
+        <Text style={styles.battleButtonTextPro}>⚔️ {t('battle')}</Text>
       </TouchableOpacity>
 
       {battleResult && (
@@ -462,18 +595,30 @@ export default function GameDashboard() {
     <View style={styles.trailerOverlay}>
       {!showCredits ? (
         <View style={styles.trailerMain}>
-          <Text style={styles.trailerSub}>TENJIKU DEVA YUDDHA: 8K PREVIEW</Text>
-          <Text style={styles.trailerTitle}>THE EVOLUTION OF HUMANITY</Text>
-          <View style={styles.trailerPan} />
-          <Text style={styles.trailerTagline}>BUILD THE MANDALA. PROTECT THE DHARMA.</Text>
+          <Text style={styles.trailerSub}>🔱 TENJIKU DEVA YUDDHA • 8K PREVIEW</Text>
+          <Text style={styles.trailerTitle}
+            {...(Platform.OS === 'web' ? { className: 'tdv-ticker-gold' } as any : {})}
+          >THE EVOLUTION{`\n`}OF HUMANITY</Text>
+          {/* Animated divider */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16, marginVertical: 30 }}>
+            <View style={{ flex: 1, height: 1, backgroundColor: 'rgba(255,215,0,0.3)' }} />
+            <Reanimated.View style={[{ width: 24, height: 24, borderRadius: 12, backgroundColor: 'rgba(255,215,0,0.2)', borderWidth: 1, borderColor: '#FFD700' }, animatedChakraGlow]} />
+            <View style={{ flex: 1, height: 1, backgroundColor: 'rgba(0,240,255,0.3)' }} />
+          </View>
+          <Text style={styles.trailerTagline}>ॐ  BUILD THE MANDALA • PROTECT THE DHARMA  ॐ</Text>
+          <Text style={{ color: 'rgba(0,240,255,0.5)', fontSize: 11, marginTop: 20, letterSpacing: 3 }}>धर्म युद्ध • DHARMA YUDDHA</Text>
         </View>
       ) : (
         <View style={styles.creditsScreen}>
-          <Text style={styles.creditsHeader}>CREATED BY</Text>
-          <Text style={styles.studioName}>EVOLUTION STUDIOS</Text>
+          <Text style={styles.creditsHeader}>🔱 CREATED BY</Text>
+          <Reanimated.Text
+            style={[styles.studioName, animatedHeaderGlow]}
+            {...(Platform.OS === 'web' ? { className: 'tdv-ticker-gold' } as any : {})}
+          >EVOLUTION STUDIOS</Reanimated.Text>
           <Text style={styles.creditsEvolution}>The Next Stage of Human Achievement.</Text>
+          <Text style={{ color: 'rgba(255,215,0,0.3)', fontSize: 13, marginTop: 10, letterSpacing: 2 }}>ॐ नमः शिवाय ॐ</Text>
           <TouchableOpacity style={styles.closeTrailer} onPress={() => setIsTrailerMode(false)}>
-            <Text style={styles.closeTrailerText}>RE-ENTER REALITY</Text>
+            <Text style={styles.closeTrailerText}>↩ RE-ENTER REALITY</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -878,7 +1023,10 @@ export default function GameDashboard() {
   return (
     <SafeAreaView style={styles.container} edges={['right', 'left', 'bottom']}>
       <View style={styles.tournamentTicker}>
-        <Text style={styles.tickerText}>🏆 LIVE TOURNAMENT: ARYAVARTA PRIME OPEN | {activeBuildProfile.tickRateHz}Hz SERVERS | CURRENT LEAD: KRISHNA_77</Text>
+        <Text
+          style={styles.tickerText}
+          {...(Platform.OS === 'web' ? { className: 'tdv-ticker-gold' } as any : {})}
+        >🏆 LIVE: ARYAVARTA PRIME OPEN  ⚡  {activeBuildProfile.tickRateHz}Hz SERVERS  ⚡  LEAD: KRISHNA_77  ॐ  धर्म युद्ध  ⚡  SEASON 1</Text>
       </View>
       <View style={[styles.connectionBanner, isOnline ? styles.connectionBannerOnline : styles.connectionBannerOffline]}>
         <Text style={styles.connectionText}>
@@ -890,33 +1038,34 @@ export default function GameDashboard() {
         <View style={isDesktop ? styles.sidebar : styles.mobileNav}>
           {!isDesktop && (
             <View style={styles.mobileBrand}>
-              <Text style={styles.headerTitlePro}>EVOLUTION</Text>
-              <Reanimated.View style={[styles.statusDot, animatedGlow]} />
-            </View>
+            <Reanimated.Text style={[styles.headerTitlePro, animatedHeaderGlow]}>TENJIKU</Reanimated.Text>
+            <Text style={[styles.headerTitlePro, { color: '#FFD700', fontSize: 10, letterSpacing: 4, marginTop: 2 }]}>DEVA YUDDHA</Text>
+            <Reanimated.View style={[styles.statusDot, animatedGlow, animatedChakraGlow]} />
+          </View>
           )}
           
           <View style={isDesktop ? styles.navSection : styles.mobileNavInner}>
-            <TouchableOpacity onPress={() => setActiveTab('VastuBuilder')} style={[styles.navItemPro, activeTab === 'VastuBuilder' && styles.navItemActivePro]}>
+            <TouchableOpacity onPress={() => setActiveTab('VastuBuilder')} style={[styles.navItemPro, activeTab === 'VastuBuilder' && styles.navItemActivePro]} {...(Platform.OS === 'web' && activeTab === 'VastuBuilder' ? { className: 'tdv-aura-breathe' } as any : {})}>
               <Entypo name="grid" size={isDesktop ? 16 : 20} color={activeTab === 'VastuBuilder' ? "#00F0FF" : "#666"} />
               {isDesktop && <Text style={[styles.navTextPro, activeTab === 'VastuBuilder' && styles.navTextActivePro]}>{t('territory')}</Text>}
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => setActiveTab('Sabha')} style={[styles.navItemPro, activeTab === 'Sabha' && styles.navItemActivePro]}>
+            <TouchableOpacity onPress={() => setActiveTab('Sabha')} style={[styles.navItemPro, activeTab === 'Sabha' && styles.navItemActivePro]} {...(Platform.OS === 'web' && activeTab === 'Sabha' ? { className: 'tdv-aura-breathe' } as any : {})}>
               <MaterialCommunityIcons name="account-group" size={isDesktop ? 16 : 20} color={activeTab === 'Sabha' ? "#FFD700" : "#666"} />
               {isDesktop && <Text style={[styles.navTextPro, activeTab === 'Sabha' && styles.navTextActivePro]}>{t('sabha')}</Text>}
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => setActiveTab('DharmaYuddha')} style={[styles.navItemPro, activeTab === 'DharmaYuddha' && styles.navItemActivePro]}>
+            <TouchableOpacity onPress={() => setActiveTab('DharmaYuddha')} style={[styles.navItemPro, activeTab === 'DharmaYuddha' && styles.navItemActivePro]} {...(Platform.OS === 'web' && activeTab === 'DharmaYuddha' ? { className: 'tdv-aura-breathe' } as any : {})}>
               <MaterialCommunityIcons name="sword-cross" size={isDesktop ? 16 : 20} color={activeTab === 'DharmaYuddha' ? "#FF4444" : "#666"} />
               {isDesktop && <Text style={[styles.navTextPro, activeTab === 'DharmaYuddha' && styles.navTextActivePro]}>{t('war')}</Text>}
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => setActiveTab('VedicHealth')} style={[styles.navItemPro, activeTab === 'VedicHealth' && styles.navItemActivePro]}>
+            <TouchableOpacity onPress={() => setActiveTab('VedicHealth')} style={[styles.navItemPro, activeTab === 'VedicHealth' && styles.navItemActivePro]} {...(Platform.OS === 'web' && activeTab === 'VedicHealth' ? { className: 'tdv-aura-breathe' } as any : {})}>
               <FontAwesome5 name="heartbeat" size={isDesktop ? 14 : 18} color={activeTab === 'VedicHealth' ? "#00FF88" : "#666"} />
               {isDesktop && <Text style={[styles.navTextPro, activeTab === 'VedicHealth' && styles.navTextActivePro]}>{t('health')}</Text>}
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => setActiveTab('Multiplayer')} style={[styles.navItemPro, activeTab === 'Multiplayer' && styles.navItemActivePro]}>
+            <TouchableOpacity onPress={() => setActiveTab('Multiplayer')} style={[styles.navItemPro, activeTab === 'Multiplayer' && styles.navItemActivePro]} {...(Platform.OS === 'web' && activeTab === 'Multiplayer' ? { className: 'tdv-aura-breathe' } as any : {})}>
               <MaterialCommunityIcons name="trophy-variant" size={isDesktop ? 16 : 20} color={activeTab === 'Multiplayer' ? "#FFD700" : "#666"} />
               {isDesktop && <Text style={[styles.navTextPro, activeTab === 'Multiplayer' && styles.navTextActivePro]}>{t('pro')}</Text>}
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => setActiveTab('LoreCodex')} style={[styles.navItemPro, activeTab === 'LoreCodex' && styles.navItemActivePro]}>
+            <TouchableOpacity onPress={() => setActiveTab('LoreCodex')} style={[styles.navItemPro, activeTab === 'LoreCodex' && styles.navItemActivePro]} {...(Platform.OS === 'web' && activeTab === 'LoreCodex' ? { className: 'tdv-aura-breathe' } as any : {})}>
               <MaterialCommunityIcons name="book-open-page-variant" size={isDesktop ? 16 : 20} color={activeTab === 'LoreCodex' ? "#00F0FF" : "#666"} />
               {isDesktop && <Text style={[styles.navTextPro, activeTab === 'LoreCodex' && styles.navTextActivePro]}>LORE</Text>}
             </TouchableOpacity>
@@ -935,13 +1084,14 @@ export default function GameDashboard() {
               <View style={styles.proProfile}>
                 <View style={styles.heroWrapper}>
                   <Image source={{ uri: 'https://images.unsplash.com/photo-1578632292335-df3abbb0d586?q=80&w=200' }} style={styles.heroImage} />
-                  <Reanimated.View style={[styles.heroGlow, animatedGlow]} />
+                  <Reanimated.View style={[styles.heroGlow, animatedChakraGlow]} />
                   <View style={styles.heroOverlay} />
                 </View>
                 <View style={styles.heroInfo}>
-                  <Text style={styles.proRankLabel}>COMMANDER</Text>
-                  <Text style={styles.heroName}>ARJUNA_DEV</Text>
+                  <Text style={styles.proRankLabel}>COMMANDER • {isNightCycle ? '🌙 NIGHT CYCLE' : '☀️ DAY CYCLE'}</Text>
+                  <Reanimated.Text style={[styles.heroName, animatedHeaderGlow]}>ARJUNA_DEV</Reanimated.Text>
                   <Reanimated.Text style={[styles.proRankVal, animatedGlow]}>{gameState.GlobalRank}</Reanimated.Text>
+                  <Text style={{ color: '#666', fontSize: 9, marginTop: 4 }}>ॐ  {gameState.KingdomName}  ॐ</Text>
                 </View>
               </View>
 
@@ -1104,27 +1254,32 @@ const styles: any = StyleSheet.create({
     maxWidth: 600,
     alignSelf: 'center',
     padding: 20,
-    backgroundColor: 'rgba(18, 22, 29, 0.98)',
+    backgroundColor: 'rgba(8, 10, 16, 0.98)',
     borderRadius: 32,
     borderWidth: 1,
-    borderColor: 'rgba(0, 240, 255, 0.3)',
+    borderColor: 'rgba(0, 240, 255, 0.4)',
     transform: [{ perspective: 1500 }, { rotateX: '24deg' }, { rotateZ: '-3deg' }],
     overflow: 'hidden',
     ...Platform.select({
-      web: { shadowColor: '#00F0FF', shadowRadius: 50, shadowOpacity: 0.1 }
+      web: { 
+        boxShadow: '0 0 60px rgba(0,240,255,0.18), 0 0 120px rgba(255,215,0,0.06), inset 0 0 40px rgba(0,0,0,0.8)',
+      }
     })
   },
   atmaOrb: {
     position: 'absolute',
-    top: '20%',
-    left: '20%',
-    width: 300,
-    height: 300,
-    borderRadius: 150,
-    backgroundColor: 'rgba(0, 240, 255, 0.04)',
+    top: '15%',
+    left: '15%',
+    width: 320,
+    height: 320,
+    borderRadius: 160,
+    backgroundColor: 'rgba(0, 240, 255, 0.05)',
     borderWidth: 1,
-    borderColor: 'rgba(0, 240, 255, 0.08)',
-    zIndex: -1
+    borderColor: 'rgba(255, 215, 0, 0.12)',
+    zIndex: -1,
+    ...Platform.select({
+      web: { boxShadow: '0 0 80px rgba(0,240,255,0.12), 0 0 30px rgba(255,215,0,0.06)' }
+    })
   },
   gridCell: {
     width: '30.5%',
@@ -1173,8 +1328,21 @@ const styles: any = StyleSheet.create({
   logHeader: { color: '#FFF', fontSize: 14, fontWeight: 'bold', marginBottom: 10, opacity: 0.8 },
   logText: { fontSize: 12, color: '#ccc', marginBottom: 5, lineHeight: 18 },
 
-  tournamentTicker: { backgroundColor: '#FFD700', paddingVertical: 6 },
-  tickerText: { color: '#000', fontSize: 10, fontWeight: '900', textAlign: 'center', letterSpacing: 1 },
+  tournamentTicker: { 
+    backgroundColor: '#0A0B0F', 
+    paddingVertical: 8,
+    borderBottomWidth: 2,
+    borderBottomColor: 'rgba(255,215,0,0.4)',
+    ...Platform.select({ web: { background: 'linear-gradient(90deg, #0A0B0F, #12100A, #0A0B0F)' } })
+  },
+  tickerText: { 
+    color: '#FFD700', 
+    fontSize: 10, 
+    fontWeight: '900', 
+    textAlign: 'center', 
+    letterSpacing: 2,
+    ...Platform.select({ web: { fontFamily: "'Cinzel', serif" } })
+  },
   connectionBanner: { paddingVertical: 6, paddingHorizontal: 12, borderBottomWidth: 1 },
   connectionBannerOnline: { backgroundColor: 'rgba(0, 255, 136, 0.12)', borderBottomColor: 'rgba(0, 255, 136, 0.3)' },
   connectionBannerOffline: { backgroundColor: 'rgba(255, 68, 68, 0.15)', borderBottomColor: 'rgba(255, 68, 68, 0.4)' },
